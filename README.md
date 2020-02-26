@@ -16,10 +16,9 @@ Extract and put the two DLLs in `LINARO_PATH\bin`
 ### Make
 
 - Download MSYS2 https://www.msys2.org/
-- In an MSYS2 terminal `pacman --sync make`
-- Make is installed at `C:\msys64\usr\bin\make.exe`
+- In an MSYS2 terminal `pacman -S make`
 
-### CLion 
+### CLion
 
 #### Terminal
 - Use shell path `"C:\msys64\usr\bin\bash.exe" --login -i`
@@ -46,4 +45,9 @@ compiledb -n -o - make\
 Load CompilationDB project in Clion\
 https://www.jetbrains.com/help/clion/compilation-database.html
 
+#### Remote Debug
 
+- Run/Debug Configurations -> GDB Remote Debug
+- Use arm-eabi-gdb.exe
+- Set target remote `127.0.0.1:1234`
+- Set Symbol file `image.elf`
