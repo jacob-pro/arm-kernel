@@ -13,8 +13,8 @@
  PROJECT_TARGETS  = image.elf image.bin
 
 ifeq ($(OS),Windows_NT)
-	QEMU_PATH        = "/c/Program Files/qemu"
-	LINARO_PATH      = /c/gcc-linaro-7.5.0-2019.12-i686-mingw32_arm-eabi
+	QEMU_PATH        = "c:/Program Files/qemu"
+	LINARO_PATH      = c:/gcc-linaro-7.5.0-2019.12-i686-mingw32_arm-eabi
 else
 	QEMU_PATH        = /usr/bin
 	LINARO_PATH      = /opt/software/gcc-linaro-5.1-2015.08-x86_64_arm-eabi

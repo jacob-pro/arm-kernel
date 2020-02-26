@@ -24,3 +24,16 @@ Extract and put the two DLLs in `LINARO_PATH\bin`
 #### Terminal
 - Use shell path `"C:\msys64\usr\bin\bash.exe" --login -i`
 - Set env variable `CHERE_INVOKING=1` to launch console in correct directory
+
+#### Compiler
+
+- Makefiles are supported via Compilation Database
+https://www.jetbrains.com/help/clion/managing-makefile-projects.html#
+- Inside MSYS:
+- `pacman -S python3`
+- `pacman -S python3-pip`
+- `pip install compiledb`
+- `compiledb -n`
+- Load CompilationDB project https://www.jetbrains.com/help/clion/compilation-database.html
+
+
