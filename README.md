@@ -27,13 +27,23 @@ Extract and put the two DLLs in `LINARO_PATH\bin`
 
 #### Compiler
 
-- Makefiles are supported via Compilation Database
+Makefiles are supported via Compilation Database\
 https://www.jetbrains.com/help/clion/managing-makefile-projects.html#
-- Inside MSYS:
+
+Inside MSYS:
 - `pacman -S python3`
 - `pacman -S python3-pip`
 - `pip install compiledb`
-- `compiledb -n`
-- Load CompilationDB project https://www.jetbrains.com/help/clion/compilation-database.html
+
+We need to replace the paths to work in Windows
+```
+compiledb -n -o - make\
+ | sed 's&"directory": "/c/&"directory": "c:/&'\
+ | sed 's&/bin/arm-eabi-gcc&/bin/arm-eabi-gcc.exe&'\
+ > compile_commands.json
+```
+
+Load CompilationDB project in Clion\
+https://www.jetbrains.com/help/clion/compilation-database.html
 
 
