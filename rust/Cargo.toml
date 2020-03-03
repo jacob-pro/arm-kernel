@@ -3,10 +3,15 @@ name = "concurrent"
 version = "0.1.0"
 authors = ["Jacob Halsey <jacob@jhalsey.com>"]
 edition = "2018"
+build = "build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+cty = "0.2.1"
 
 [lib]
 crate-type = ["staticlib"]
+
+[build-dependencies]
+bindgen = "0.53.1"

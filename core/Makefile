@@ -33,18 +33,19 @@ endif
 #QEMU_DISPLAY     =            -display  sdl
 
  LINARO_PREFIX    = arm-eabi
+ LIBC_INCLUDES    = ${LINARO_PATH}/${LINARO_PREFIX}/libc/usr/include
 
 # part 2: build commands
 
 build       : ${PROJECT_TARGETS}
 
 ${LIBCONCURRENT_PATH}: ${LIBCONCURRENT_SRC}
-	cd ../rust && $(MAKE)
+	cd ../rust && sh build.sh
 
 %.o   : %.s
-	${LINARO_PATH}/bin/${LINARO_PREFIX}-as  $(addprefix -I , ${PROJECT_PATH} ${LINARO_PATH}/${LINARO_PREFIX}/libc/usr/include) -mcpu=cortex-a8                                       -g                            -o ${@} ${<}
+	${LINARO_PATH}/bin/${LINARO_PREFIX}-as  $(addprefix -I , ${PROJECT_PATH} ${LIBC_INCLUDES}) -mcpu=cortex-a8                                       -g                            -o ${@} ${<}
 %.o   : %.c
-	${LINARO_PATH}/bin/${LINARO_PREFIX}-gcc $(addprefix -I , ${PROJECT_PATH} ${LINARO_PATH}/${LINARO_PREFIX}/libc/usr/include) -mcpu=cortex-a8 -mabi=aapcs -ffreestanding -std=gnu99 -g -c -fomit-frame-pointer -O -o ${@} ${<}
+	${LINARO_PATH}/bin/${LINARO_PREFIX}-gcc $(addprefix -I , ${PROJECT_PATH} ${LIBC_INCLUDES}) -mcpu=cortex-a8 -mabi=aapcs -ffreestanding -std=gnu99 -g -c -fomit-frame-pointer -O -o ${@} ${<}
 
 %.elf : ${PROJECT_OBJECTS}
 	${LINARO_PATH}/bin/${LINARO_PREFIX}-ld  $(addprefix -L , ${LINARO_PATH}/${LINARO_PREFIX}/libc/usr/lib) -T ${*}.ld -o ${@} ${^} -lc -lgcc -lconcurrent -L${LIBCONCURRENT_DIR}
@@ -69,6 +70,9 @@ kill-gdb    :
 
 clean       :
 	rm -f core ${PROJECT_OBJECTS} ${PROJECT_TARGETS}
+
+print-%:
+	@echo $($*)
 
 include Makefile.console
 include Makefile.disk

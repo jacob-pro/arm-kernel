@@ -1,4 +1,3 @@
 
-`rustup override set beta`
-
-`rustup target add armv7a-none-eabi`
+Clang is required to generate headers\
+https://rust-lang.github.io/rust-bindgen/requirements.html

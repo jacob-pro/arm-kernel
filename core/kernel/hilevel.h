@@ -24,4 +24,6 @@
 #include "lolevel.h"
 #include     "int.h"
 
+void hilevel_handler_rst_c();
+
 #endif
