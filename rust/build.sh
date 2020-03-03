@@ -5,4 +5,5 @@ set -x #echo on
 # https://github.com/rust-lang/rust/pull/68253
 rustup override set beta
 rustup target add armv7a-none-eabi
-cargo build --target=armv7a-none-eabi
+# This is a hack to force build.rs to run every time
+touch build.rs && cargo build --target=armv7a-none-eabi
