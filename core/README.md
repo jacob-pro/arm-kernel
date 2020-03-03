@@ -23,6 +23,7 @@ Extract and put the two DLLs in `LINARO_PATH\bin`
 #### Terminal
 - Use shell path `"C:\msys64\usr\bin\bash.exe" --login -i`
 - Set env variable `CHERE_INVOKING=1` to launch console in correct directory
+- Set env variable `MSYS2_PATH_TYPE=inherit` to inherit Windows PATH variable
 
 #### Compiler
 

@@ -6,11 +6,16 @@
 
 # part 1: variables
 
+ LIBCONCURRENT_SRC  = $(shell find ../rust/src -name *.rs)
+ LIBCONCURRENT_DIR  = ../rust/target/armv7a-none-eabi/debug
+ LIBCONCURRENT_PATH := $(LIBCONCURRENT_DIR)/libconcurrent.a
+
  PROJECT_PATH     = $(shell find . -mindepth 1 -maxdepth 1 -type d)
  PROJECT_SOURCES  = $(shell find ${PROJECT_PATH} -name *.c -o -name *.s)
  PROJECT_HEADERS  = $(shell find ${PROJECT_PATH} -name *.h             )
- PROJECT_OBJECTS  = $(addsuffix .o, $(basename ${PROJECT_SOURCES}))
+ PROJECT_OBJECTS  = $(addsuffix .o, $(basename ${PROJECT_SOURCES})) $(LIBCONCURRENT_PATH)
  PROJECT_TARGETS  = image.elf image.bin
+
 
 ifeq ($(OS),Windows_NT)
 	QEMU_PATH        = "c:/Program Files/qemu"
@@ -31,36 +36,39 @@ endif
 
 # part 2: build commands
 
+build       : ${PROJECT_TARGETS}
+
+${LIBCONCURRENT_PATH}: ${LIBCONCURRENT_SRC}
+	cd ../rust && $(MAKE)
+
 %.o   : %.s
-	@${LINARO_PATH}/bin/${LINARO_PREFIX}-as  $(addprefix -I , ${PROJECT_PATH} ${LINARO_PATH}/${LINARO_PREFIX}/libc/usr/include) -mcpu=cortex-a8                                       -g                            -o ${@} ${<}
+	${LINARO_PATH}/bin/${LINARO_PREFIX}-as  $(addprefix -I , ${PROJECT_PATH} ${LINARO_PATH}/${LINARO_PREFIX}/libc/usr/include) -mcpu=cortex-a8                                       -g                            -o ${@} ${<}
 %.o   : %.c
-	@${LINARO_PATH}/bin/${LINARO_PREFIX}-gcc $(addprefix -I , ${PROJECT_PATH} ${LINARO_PATH}/${LINARO_PREFIX}/libc/usr/include) -mcpu=cortex-a8 -mabi=aapcs -ffreestanding -std=gnu99 -g -c -fomit-frame-pointer -O -o ${@} ${<}
+	${LINARO_PATH}/bin/${LINARO_PREFIX}-gcc $(addprefix -I , ${PROJECT_PATH} ${LINARO_PATH}/${LINARO_PREFIX}/libc/usr/include) -mcpu=cortex-a8 -mabi=aapcs -ffreestanding -std=gnu99 -g -c -fomit-frame-pointer -O -o ${@} ${<}
 
 %.elf : ${PROJECT_OBJECTS}
-	@${LINARO_PATH}/bin/${LINARO_PREFIX}-ld  $(addprefix -L ,                 ${LINARO_PATH}/${LINARO_PREFIX}/libc/usr/lib    ) -T ${*}.ld -o ${@} ${^} -lc -lgcc
+	${LINARO_PATH}/bin/${LINARO_PREFIX}-ld  $(addprefix -L , ${LINARO_PATH}/${LINARO_PREFIX}/libc/usr/lib) -T ${*}.ld -o ${@} ${^} -lc -lgcc -lconcurrent -L${LIBCONCURRENT_DIR}
 %.bin : %.elf
-	@${LINARO_PATH}/bin/${LINARO_PREFIX}-objcopy -O binary ${<} ${@}
+	${LINARO_PATH}/bin/${LINARO_PREFIX}-objcopy -O binary ${<} ${@}
 
 # part 3: targets
 
 .PRECIOUS   : ${PROJECT_OBJECTS} ${PROJECT_TARGETS}
 
-build       : ${PROJECT_TARGETS}
-
 launch-qemu : ${PROJECT_TARGETS}
-	@${QEMU_PATH}/qemu-system-arm -nodefaults -M realview-pb-a8 -m 512M ${QEMU_DISPLAY} -gdb tcp:${QEMU_GDB} $(addprefix -serial , ${QEMU_UART}) -S -kernel $(filter %.bin, ${PROJECT_TARGETS})
+	${QEMU_PATH}/qemu-system-arm -nodefaults -M realview-pb-a8 -m 512M ${QEMU_DISPLAY} -gdb tcp:${QEMU_GDB} $(addprefix -serial , ${QEMU_UART}) -S -kernel $(filter %.bin, ${PROJECT_TARGETS})
 
 launch-gdb  : ${PROJECT_TARGETS}
-	@${LINARO_PATH}/bin/${LINARO_PREFIX}-gdb -ex "file $(filter %.elf, ${PROJECT_TARGETS})" -ex "target remote ${QEMU_GDB}"
+	${LINARO_PATH}/bin/${LINARO_PREFIX}-gdb -ex "file $(filter %.elf, ${PROJECT_TARGETS})" -ex "target remote ${QEMU_GDB}"
 
 kill-qemu   :
-	@-killall --quiet --user ${USER} qemu-system-arm
+	-killall --quiet --user ${USER} qemu-system-arm
 
 kill-gdb    :
-	@-killall --quiet --user ${USER} ${LINARO_PREFIX}-gdb
+	-killall --quiet --user ${USER} ${LINARO_PREFIX}-gdb
 
 clean       :
-	@rm -f core ${PROJECT_OBJECTS} ${PROJECT_TARGETS}
+	rm -f core ${PROJECT_OBJECTS} ${PROJECT_TARGETS}
 
 include Makefile.console
 include Makefile.disk
