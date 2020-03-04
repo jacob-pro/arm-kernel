@@ -7,7 +7,7 @@
 
 #include "hilevel.h"
 
-void hilevel_handler_rst_c() {
+void hilevel_handler_rst_c(ctx_t* ctx) {
     /* Configure the mechanism for interrupt handling by
      *
      * - configuring UART st. an interrupt is raised every time a byte is
@@ -46,7 +46,7 @@ void hilevel_handler_rst_c() {
     return;
 }
 
-void hilevel_handler_irq() {
+void hilevel_handler_irq_c() {
     // Step 2: read  the interrupt identifier so we know the source.
 
     uint32_t id = GICC0->IAR;
@@ -72,7 +72,7 @@ void hilevel_handler_irq() {
     return;
 }
 
-void hilevel_handler_svc() {
+void hilevel_handler_svc_c(ctx_t* ctx, uint32_t id) {
     /* Each time execution reaches this point, we are tasked with handling
      * a supervisor call (aka. software interrupt, i.e., a trap or system
      * call).

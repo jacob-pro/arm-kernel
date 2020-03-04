@@ -24,6 +24,12 @@
 #include "lolevel.h"
 #include     "int.h"
 
-void hilevel_handler_rst_c();
+typedef struct {
+    uint32_t cpsr, pc, gpr[ 13 ], sp, lr;
+} ctx_t;
+
+void hilevel_handler_rst_c(ctx_t* ctx);
+void hilevel_handler_irq_c();
+void hilevel_handler_svc_c(ctx_t* ctx, uint32_t id);
 
 #endif
