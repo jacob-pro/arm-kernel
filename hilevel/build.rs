@@ -46,5 +46,5 @@ fn make_print(variable: &str) -> String {
 fn cbindgen() {
     let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let bindings = cbindgen::generate(&crate_dir).expect("Failed to generate bindings");
-    bindings.write_to_file(format!("{}/include/rust.h", crate_dir));
+    bindings.write_to_file(format!("{}/include/hilevel.h", crate_dir));
 }

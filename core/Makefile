@@ -6,14 +6,14 @@
 
 # part 1: variables
 
- LIBCONCURRENT_SRC  = $(shell find ../rust/src -name *.rs)
- LIBCONCURRENT_DIR  = ../rust/target/armv7a-none-eabi/debug
- LIBCONCURRENT_PATH := $(LIBCONCURRENT_DIR)/libconcurrent.a
+ LIBHILEVEL_SRC  = $(shell find ../hilevel/src -name *.rs)
+ LIBHILEVEL_DIR  = ../hilevel/target/armv7a-none-eabi/debug
+ LIBHILEVEL_PATH := $(LIBHILEVEL_DIR)/libhilevel.a
 
  PROJECT_PATH     = $(shell find . -mindepth 1 -maxdepth 1 -type d)
  PROJECT_SOURCES  = $(shell find ${PROJECT_PATH} -name *.c -o -name *.s)
  PROJECT_HEADERS  = $(shell find ${PROJECT_PATH} -name *.h             )
- PROJECT_OBJECTS  = $(addsuffix .o, $(basename ${PROJECT_SOURCES})) $(LIBCONCURRENT_PATH)
+ PROJECT_OBJECTS  = $(addsuffix .o, $(basename ${PROJECT_SOURCES})) $(LIBHILEVEL_PATH)
  PROJECT_TARGETS  = image.elf image.bin
 
 
@@ -39,8 +39,8 @@ endif
 
 build       : ${PROJECT_TARGETS}
 
-${LIBCONCURRENT_PATH}: ${LIBCONCURRENT_SRC}
-	cd ../rust && sh build.sh
+${LIBHILEVEL_PATH}: ${LIBHILEVEL_SRC}
+	cd ../hilevel && sh build.sh
 
 %.o   : %.s
 	${LINARO_PATH}/bin/${LINARO_PREFIX}-as  $(addprefix -I , ${PROJECT_PATH} ${LIBC_INCLUDES}) -mcpu=cortex-a8                                       -g                            -o ${@} ${<}
@@ -48,7 +48,7 @@ ${LIBCONCURRENT_PATH}: ${LIBCONCURRENT_SRC}
 	${LINARO_PATH}/bin/${LINARO_PREFIX}-gcc $(addprefix -I , ${PROJECT_PATH} ${LIBC_INCLUDES}) -mcpu=cortex-a8 -mabi=aapcs -ffreestanding -std=gnu99 -g -c -fomit-frame-pointer -O -o ${@} ${<}
 
 %.elf : ${PROJECT_OBJECTS}
-	${LINARO_PATH}/bin/${LINARO_PREFIX}-ld  $(addprefix -L , ${LINARO_PATH}/${LINARO_PREFIX}/libc/usr/lib) -T ${*}.ld -o ${@} ${^} -lc -lgcc -lconcurrent -L${LIBCONCURRENT_DIR}
+	${LINARO_PATH}/bin/${LINARO_PREFIX}-ld  $(addprefix -L , ${LINARO_PATH}/${LINARO_PREFIX}/libc/usr/lib) -T ${*}.ld -o ${@} ${^} -lc -lgcc -lhilevel -L${LIBHILEVEL_DIR}
 %.bin : %.elf
 	${LINARO_PATH}/bin/${LINARO_PREFIX}-objcopy -O binary ${<} ${@}
 

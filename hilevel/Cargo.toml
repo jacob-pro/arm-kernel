@@ -1,5 +1,5 @@
 [package]
-name = "concurrent"
+name = "hilevel"
 version = "0.1.0"
 authors = ["Jacob Halsey <jacob@jhalsey.com>"]
 edition = "2018"

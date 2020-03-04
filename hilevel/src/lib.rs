@@ -7,7 +7,6 @@
 mod bindings;
 
 use core::panic::PanicInfo;
-use bindings::ctx_t;
 use bindings::PL011_putc;
 use bindings::UART0;
 use arr_macro::arr;
@@ -16,6 +15,16 @@ use crate::ProcessStatus::{Executing, Ready};
 use core::slice::from_raw_parts;
 
 type PID = cty::c_int;
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct Context {
+    pub cpsr: u32,
+    pub pc: u32,
+    pub gpr: [u32; 13usize],
+    pub sp: u32,
+    pub lr: u32,
+}
 
 enum ProcessStatus {
     Ready,
@@ -26,7 +35,7 @@ struct ProcessControlBlock {
     pid: PID,
     status: ProcessStatus,
     top_of_stack: u32,
-    context: ctx_t,
+    context: Context,
 }
 
 const CPSR_USR: u32 = 0x50;
@@ -43,7 +52,7 @@ extern {
 }
 
 
-fn dispatch(ctx: &mut ctx_t, prev: &mut Option<ProcessControlBlock>, next: &mut Option<ProcessControlBlock>) {
+fn dispatch(ctx: &mut Context, prev: &mut Option<ProcessControlBlock>, next: &mut Option<ProcessControlBlock>) {
     let mut prev_pid = '?' as u8;
     let mut next_pid = '?' as u8;
 
@@ -75,7 +84,7 @@ fn dispatch(ctx: &mut ctx_t, prev: &mut Option<ProcessControlBlock>, next: &mut 
     unsafe { EXECUTING = next.as_ref().map(|x| x.pid) }; // update   executing process to P_{next}
 }
 
-fn schedule(ctx: &mut ctx_t) {
+fn schedule(ctx: &mut Context) {
     unsafe {
         match EXECUTING {
             Some(x) => {
@@ -98,7 +107,7 @@ fn schedule(ctx: &mut ctx_t) {
 
 
 #[no_mangle]
-pub extern fn hilevel_handler_rst(ctx: *mut ctx_t) {
+pub extern fn hilevel_handler_rst(ctx: *mut Context) {
     let ctx = unsafe { &mut *ctx};
 
     unsafe {
@@ -107,7 +116,7 @@ pub extern fn hilevel_handler_rst(ctx: *mut ctx_t) {
             pid: 1,
             status: ProcessStatus::Ready,
             top_of_stack: tos,
-            context: ctx_t {
+            context: Context {
                 cpsr: CPSR_USR,
                 pc: main_P1 as u32,
                 gpr: [0; 13],
@@ -122,7 +131,7 @@ pub extern fn hilevel_handler_rst(ctx: *mut ctx_t) {
             pid: 2,
             status: ProcessStatus::Ready,
             top_of_stack: tos,
-            context: ctx_t {
+            context: Context {
                 cpsr: CPSR_USR,
                 pc: main_P2 as u32,
                 gpr: [0; 13],
@@ -142,7 +151,7 @@ pub extern fn hilevel_handler_irq() {
 }
 
 #[no_mangle]
-pub extern fn hilevel_handler_svc(ctx: *mut bindings::ctx_t, id: u32) {
+pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
     let ctx = unsafe { &mut *ctx};
 
     match id {
