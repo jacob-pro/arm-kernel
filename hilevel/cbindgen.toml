@@ -20,9 +20,9 @@ include_version = false
 # namespace = "my_namespace"
 namespaces = []
 using_namespaces = []
-sys_includes = []
+sys_includes = ["stdarg.h", "stdbool.h", "stdint.h"]
 includes = []
-no_includes = false
+no_includes = true
 
 
 
