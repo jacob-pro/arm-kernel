@@ -1,10 +1,14 @@
-#![no_std] // don't link the Rust standard library
+#![no_std]
+#![feature(alloc_error_handler)]
+
+extern crate alloc;
 
 #[allow(non_upper_case_globals)]
 #[allow(non_camel_case_types)]
 #[allow(non_snake_case)]
 #[allow(dead_code)]
 mod bindings;
+mod allocator;
 
 use core::panic::PanicInfo;
 use bindings::PL011_putc;
@@ -16,6 +20,8 @@ use arr_macro::arr;
 use core::char::from_digit;
 use crate::ProcessStatus::{Executing, Ready};
 use core::slice::from_raw_parts;
+use alloc::boxed::Box;
+use alloc::format;
 
 type PID = cty::c_int;
 
@@ -164,6 +170,8 @@ pub extern fn hilevel_handler_rst(ctx: *mut Context) {
     unsafe {
         dispatch(ctx, &mut None, &mut PROCESS_TABLE[0]);
     }
+
+    let _: Box<[u8; 10]> = Box::new([0; 10]);
 }
 
 #[no_mangle]
@@ -208,6 +216,18 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
 
 
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
+fn handle_panic(info: &PanicInfo) -> ! {
+    let str = format!("{}", info);
+    unsafe { PL011_putc( UART0, '\n' as u8, true ) };
+    str.as_bytes().into_iter().for_each(|b| {
+        unsafe { PL011_putc( UART0, *b, true ) };
+    });
+    abort()
+}
+
+#[no_mangle]
+pub extern fn abort() -> ! {
+    // Disable to stop interrupts resuming execution
+    unsafe { bindings::int_unable_irq(); }
     loop {}
 }

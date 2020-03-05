@@ -21,6 +21,12 @@ SECTIONS {
     .             = . + 0x00001000;
     _heap_end    = .;
   }
+  /* required for something? in libgcc called by Rust alloc */
+  .ARM.exidx : {
+      __exidx_start = .;
+      *(.ARM.exidx* .gnu.linkonce.armexidx.*)
+      __exidx_end = .;
+  }
   /* align       address (per AAPCS) */
   .       = ALIGN( 8 );        
   /* allocate stack for irq mode     */

@@ -10,13 +10,19 @@ fn main() {
 
 // Generate Rust code to import C functions
 fn bindgen() {
-    let header_includes = make_print("PROJECT_PATH").split_whitespace().map(|path| {
-        format!("-I../core/{}", &path[2..])
+    
+    let mut header_includes = make_print("PROJECT_PATH").split_whitespace().map(|path| {
+        format!("../core/{}", &path[2..])
+    }).collect::<Vec<String>>();
+    header_includes.push(make_print("LIBC_INCLUDES"));
+
+    let header_includes_args = header_includes.into_iter().map(|path| {
+        format!("-I{}", path)
     }).collect::<Vec<String>>();
 
     let bindings = bindgen::Builder::default()
         .clang_arg("--target=armv7a-none-eabi")
-        .clang_args(header_includes)
+        .clang_args(header_includes_args)
         .use_core()
         .ctypes_prefix("cty")
         .header("../core/bindings.h")

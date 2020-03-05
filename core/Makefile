@@ -6,7 +6,7 @@
 
 # part 1: variables
 
- LIBHILEVEL_SRC  = $(shell find ../hilevel/src -name *.rs)
+ LIBHILEVEL_SRC  = $(shell find ../hilevel/src -name *.rs) bindings.h
  LIBHILEVEL_DIR  = ../hilevel/target/armv7a-none-eabi/debug
  LIBHILEVEL_PATH := $(LIBHILEVEL_DIR)/libhilevel.a
 
