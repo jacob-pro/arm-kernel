@@ -6,7 +6,6 @@
 
 # part 1: variables
 
- LIBHILEVEL_SRC  = $(shell find ../hilevel/src -name *.rs) bindings.h
  LIBHILEVEL_DIR  = ../hilevel/target/armv7a-none-eabi/debug
  LIBHILEVEL_PATH := $(LIBHILEVEL_DIR)/libhilevel.a
 
@@ -16,6 +15,7 @@
  PROJECT_OBJECTS  = $(addsuffix .o, $(basename ${PROJECT_SOURCES})) $(LIBHILEVEL_PATH)
  PROJECT_TARGETS  = image.elf image.bin
 
+ LIBHILEVEL_SRC  = $(shell find ../hilevel/src -name *.rs) bindings.h ${PROJECT_HEADERS}
 
 ifeq ($(OS),Windows_NT)
 	QEMU_PATH        = "c:/Program Files/qemu"
