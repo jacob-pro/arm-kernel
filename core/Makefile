@@ -15,7 +15,7 @@
  PROJECT_OBJECTS  = $(addsuffix .o, $(basename ${PROJECT_SOURCES})) $(LIBHILEVEL_PATH)
  PROJECT_TARGETS  = image.elf image.bin
 
- LIBHILEVEL_SRC  = $(shell find ../hilevel/src -name *.rs) bindings.h ${PROJECT_HEADERS}
+ LIBHILEVEL_SRC  = $(shell find ../hilevel -name *.rs -o -name *.toml) bindings.h ${PROJECT_HEADERS}
 
 ifeq ($(OS),Windows_NT)
 	QEMU_PATH        = "c:/Program Files/qemu"
@@ -56,8 +56,13 @@ ${LIBHILEVEL_PATH}: ${LIBHILEVEL_SRC}
 
 .PRECIOUS   : ${PROJECT_OBJECTS} ${PROJECT_TARGETS}
 
+BASE_LAUNCH = ${QEMU_PATH}/qemu-system-arm -nodefaults -M realview-pb-a8 -m 512M ${QEMU_DISPLAY} -gdb tcp:${QEMU_GDB} $(addprefix -serial , ${QEMU_UART}) -kernel $(filter %.bin, ${PROJECT_TARGETS})
+
+launch: ${PROJECT_TARGETS}
+	${BASE_LAUNCH}
+
 launch-qemu : ${PROJECT_TARGETS}
-	${QEMU_PATH}/qemu-system-arm -nodefaults -M realview-pb-a8 -m 512M ${QEMU_DISPLAY} -gdb tcp:${QEMU_GDB} $(addprefix -serial , ${QEMU_UART}) -S -kernel $(filter %.bin, ${PROJECT_TARGETS})
+	${BASE_LAUNCH} -S
 
 launch-gdb  : ${PROJECT_TARGETS}
 	${LINARO_PATH}/bin/${LINARO_PREFIX}-gdb -ex "file $(filter %.elf, ${PROJECT_TARGETS})" -ex "target remote ${QEMU_GDB}"

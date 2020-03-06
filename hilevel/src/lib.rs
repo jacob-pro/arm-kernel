@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(alloc_error_handler)]
+#![feature(core_intrinsics)]
 
 extern crate alloc;
 
@@ -9,21 +10,22 @@ extern crate alloc;
 #[allow(dead_code)]
 mod bindings;
 mod allocator;
+mod device;
 
 use core::panic::PanicInfo;
 use bindings::PL011_putc;
-use bindings::UART0;
 use bindings::TIMER0;
 use bindings::GICC0;
 use bindings::GICD0;
-use arr_macro::arr;
 use core::char::from_digit;
 use crate::ProcessStatus::{Executing, Ready};
 use core::slice::from_raw_parts;
 use alloc::boxed::Box;
-use alloc::format;
+use alloc::collections::BTreeMap;
+use core::fmt::Write;
+use crate::device::PL011::UART0;
 
-type PID = cty::c_int;
+type PID = usize;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -50,7 +52,17 @@ struct ProcessControlBlock {
 const CPSR_USR: u32 = 0x50;
 
 static mut EXECUTING: Option<PID> = None;
-static mut PROCESS_TABLE: [Option<ProcessControlBlock>; 64] = arr![None; 64];
+
+static mut PROCESS_TABLE: Option<BTreeMap<u32, ProcessControlBlock>> = None;
+
+fn process_table_init() {
+    unsafe { PROCESS_TABLE = Some(BTreeMap::new()) }
+}
+
+fn process_table() -> &'static mut BTreeMap<u32, ProcessControlBlock> {
+    unsafe { PROCESS_TABLE.as_mut().unwrap() }
+}
+
 
 #[allow(non_upper_case_globals)]
 extern {
@@ -63,7 +75,7 @@ extern {
 }
 
 
-fn dispatch(ctx: &mut Context, prev: &mut Option<ProcessControlBlock>, next: &mut Option<ProcessControlBlock>) {
+fn dispatch(ctx: &mut Context, prev: Option<&mut ProcessControlBlock>, next: Option<&mut ProcessControlBlock>) {
     let mut prev_pid = '?' as u8;
     let mut next_pid = '?' as u8;
 
@@ -75,7 +87,7 @@ fn dispatch(ctx: &mut Context, prev: &mut Option<ProcessControlBlock>, next: &mu
         None => {}
     }
 
-    match next {
+    match &next {
         Some(x) => {
             next_pid = from_digit(x.pid as u32, 10).unwrap() as u8;
             *ctx = x.context;
@@ -84,15 +96,15 @@ fn dispatch(ctx: &mut Context, prev: &mut Option<ProcessControlBlock>, next: &mu
     }
 
     unsafe {
-        PL011_putc( UART0, '[' as u8, true );
-        PL011_putc( UART0, prev_pid, true );
-        PL011_putc( UART0, '-' as u8, true );
-        PL011_putc( UART0, '>' as u8, true );
-        PL011_putc( UART0, next_pid, true );
-        PL011_putc( UART0, ']' as u8, true );
+        PL011_putc( bindings::UART0, '[' as u8, true );
+        PL011_putc( bindings::UART0, prev_pid, true );
+        PL011_putc( bindings::UART0, '-' as u8, true );
+        PL011_putc( bindings::UART0, '>' as u8, true );
+        PL011_putc( bindings::UART0, next_pid, true );
+        PL011_putc( bindings::UART0, ']' as u8, true );
     }
 
-    unsafe { EXECUTING = next.as_ref().map(|x| x.pid) }; // update   executing process to P_{next}
+    unsafe { EXECUTING = next.map(|x| x.pid) }; // update   executing process to P_{next}
 }
 
 fn schedule(ctx: &mut Context) {
@@ -100,15 +112,15 @@ fn schedule(ctx: &mut Context) {
         match EXECUTING {
             Some(x) => {
 
-                if x == PROCESS_TABLE[0].as_ref().unwrap().pid {
-                    dispatch( ctx, &mut PROCESS_TABLE[ 0 ], &mut PROCESS_TABLE[ 1 ] );  // context switch P_1 -> P_2
-                    PROCESS_TABLE[0].as_mut().unwrap().status = Ready;             // update   execution status  of P_1
-                    PROCESS_TABLE[1].as_mut().unwrap().status = Executing;         // update   execution status  of P_2
+                if x == process_table()[&1].pid {
+                    dispatch( ctx, process_table().get_mut(&1), process_table().get_mut(&2) );  // context switch P_1 -> P_2
+                    process_table().get_mut(&1).unwrap().status = Ready;             // update   execution status  of P_1
+                    process_table().get_mut(&2).unwrap().status = Executing;         // update   execution status  of P_2
 
-                } else if x == PROCESS_TABLE[1].as_ref().unwrap().pid {
-                    dispatch( ctx, &mut PROCESS_TABLE[ 1 ], &mut PROCESS_TABLE[ 0 ] );  // context switch P_2 -> P_1
-                    PROCESS_TABLE[1].as_mut().unwrap().status = Ready;             // update   execution status  of P_2
-                    PROCESS_TABLE[0].as_mut().unwrap().status = Executing;         // update   execution status  of P_1
+                } else if x == process_table()[&2].pid {
+                    dispatch( ctx, process_table().get_mut(&2), process_table().get_mut(&1) );  // context switch P_2 -> P_1
+                    process_table().get_mut(&2).unwrap().status = Ready;             // update   execution status  of P_2
+                    process_table().get_mut(&1).unwrap().status = Executing;         // update   execution status  of P_1
                 }
             }
             None => {}
@@ -121,9 +133,11 @@ fn schedule(ctx: &mut Context) {
 pub extern fn hilevel_handler_rst(ctx: *mut Context) {
     let ctx = unsafe { &mut *ctx};
 
+    process_table_init();
+
     unsafe {
         let tos = &tos_P1 as *const _ as u32;
-        PROCESS_TABLE[0] = Some(ProcessControlBlock {
+        process_table().insert(1, ProcessControlBlock {
             pid: 1,
             status: ProcessStatus::Ready,
             top_of_stack: tos,
@@ -138,7 +152,7 @@ pub extern fn hilevel_handler_rst(ctx: *mut Context) {
     }
     unsafe {
         let tos = &tos_P2 as *const _ as u32;
-        PROCESS_TABLE[1] = Some(ProcessControlBlock {
+        process_table().insert(2, ProcessControlBlock {
             pid: 2,
             status: ProcessStatus::Ready,
             top_of_stack: tos,
@@ -168,10 +182,9 @@ pub extern fn hilevel_handler_rst(ctx: *mut Context) {
     }
 
     unsafe {
-        dispatch(ctx, &mut None, &mut PROCESS_TABLE[0]);
+        dispatch(ctx, None, PROCESS_TABLE.as_mut().unwrap().get_mut(&1));
     }
 
-    let _: Box<[u8; 10]> = Box::new([0; 10]);
 }
 
 #[no_mangle]
@@ -183,7 +196,7 @@ pub extern fn hilevel_handler_irq(ctx: *mut Context) {
 
         if id == bindings::GIC_SOURCE_TIMER0 {
 
-            PL011_putc(UART0, 'T' as u8, true);
+            PL011_putc(bindings::UART0, 'T' as u8, true);
             (*TIMER0).Timer1IntClr = 0x01;
             schedule(ctx);
         }
@@ -207,7 +220,7 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
             let length = ctx.gpr[2] as usize;
             let slice = unsafe { from_raw_parts(start_ptr, length) };
             slice.iter().for_each(|b| {
-                unsafe { PL011_putc( UART0, *b, true ) };
+                unsafe { PL011_putc( bindings::UART0, *b, true ) };
             });
         }
         _ => {}
@@ -217,17 +230,15 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
 
 #[panic_handler]
 fn handle_panic(info: &PanicInfo) -> ! {
-    let str = format!("{}", info);
-    unsafe { PL011_putc( UART0, '\n' as u8, true ) };
-    str.as_bytes().into_iter().for_each(|b| {
-        unsafe { PL011_putc( UART0, *b, true ) };
-    });
+    writeln!(UART0(), "\n{}", info).ok();
     abort()
 }
 
 #[no_mangle]
 pub extern fn abort() -> ! {
-    // Disable to stop interrupts resuming execution
-    unsafe { bindings::int_unable_irq(); }
-    loop {}
+    unsafe {
+        // Disable to stop interrupts resuming execution
+        bindings::int_unable_irq();
+        core::intrinsics::abort()
+    }
 }
