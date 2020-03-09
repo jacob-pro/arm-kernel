@@ -21,7 +21,7 @@ SECTIONS {
     .             = . + 0x00001000;
     _heap_end    = .;
   }
-  /* required for something? in libgcc called by Rust alloc */
+  /* required for something in libgcc called by Rust alloc */
   .ARM.exidx : {
       __exidx_start = .;
       *(.ARM.exidx* .gnu.linkonce.armexidx.*)
@@ -29,12 +29,9 @@ SECTIONS {
   }
   /* align       address (per AAPCS) */
   .       = ALIGN( 8 );        
-  /* allocate stack for irq mode     */
+  /* allocate stack for SVC/IRQ mode     */
   .       = . + 0x00001000;  
-  tos_irq = .;
-  /* allocate stack for svc mode     */
-  .       = . + 0x00001000;  
-  tos_svc = .;
+  tos_int = .;
   /* allocate stack for P1           */
   .       = . + 0x00001000;
   tos_P1  = .;
