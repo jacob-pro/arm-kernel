@@ -1,6 +1,5 @@
 use crate::process::ProcessManager;
 use crate::device::PL011::UART0;
-use core::fmt::Write;
 
 #[derive(Default)]
 pub struct KernelState {

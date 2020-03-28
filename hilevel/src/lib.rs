@@ -22,7 +22,6 @@ use bindings::GICD0;
 use core::slice::from_raw_parts;
 use core::fmt::Write;
 use crate::device::PL011::UART0;
-use process::*;
 
 
 #[repr(C)]
@@ -34,9 +33,6 @@ pub struct Context {
     pub sp: u32,
     pub lr: u32,
 }
-
-const CPSR_USR: u32 = 0x50;
-
 
 #[allow(non_upper_case_globals)]
 extern {
@@ -55,35 +51,13 @@ pub extern fn hilevel_handler_rst(ctx: *mut Context) {
     let state = state::init();
 
     unsafe {
-        let tos = &tos_P1 as *const _ as u32;
-        state.process_manager.table.insert(1, ProcessControlBlock {
-            pid: 1,
-            status: ProcessStatus::Ready,
-            top_of_stack: tos,
-            context: Context {
-                cpsr: CPSR_USR,
-                pc: main_P3 as u32,
-                gpr: [0; 13],
-                sp: tos,
-                lr: 0,
-            }
-        });
+        let tos1 = &tos_P1 as *const u32;
+        let tos2 = &tos_P2 as *const u32;
+
+        state.process_manager.create_process(1, tos1, main_P3);
+        state.process_manager.create_process(2, tos2, main_P4);
     }
-    unsafe {
-        let tos = &tos_P2 as *const _ as u32;
-        state.process_manager.table.insert(2, ProcessControlBlock {
-            pid: 2,
-            status: ProcessStatus::Ready,
-            top_of_stack: tos,
-            context: Context {
-                cpsr: CPSR_USR,
-                pc: main_P4 as u32,
-                gpr: [0; 13],
-                sp: tos,
-                lr: 0,
-            }
-        });
-    }
+
 
     unsafe {
         (*TIMER0).Timer1Load  = 0x00100000; // select period = 2^20 ticks ~= 1 sec
@@ -100,9 +74,7 @@ pub extern fn hilevel_handler_rst(ctx: *mut Context) {
         bindings::int_enable_irq();
     }
 
-
-    state.process_manager.dispatch(ctx, None, Some(1));
-
+    state.process_manager.schedule(ctx);
 }
 
 #[no_mangle]

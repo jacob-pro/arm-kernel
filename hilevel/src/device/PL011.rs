@@ -26,6 +26,7 @@ pub fn UART3() -> PL011 {
 
 
 impl Write for PL011 {
+
     fn write_str(&mut self, s: &str) -> Result<(), Error> {
         s.as_bytes().iter().for_each(|b| {
             unsafe { PL011_putc( self.0, *b, true ) };
@@ -36,8 +37,9 @@ impl Write for PL011 {
 
 impl PL011 {
 
-    pub fn write_ln(&mut self, s: &str) -> Result<(), Error> {
-        self.write_fmt(format_args!("{}\n", s))
+    #[allow(unused_must_use)]
+    pub fn write_ln(&mut self, s: &str) {
+        self.write_fmt(format_args!("{}\n", s));
     }
 
 }
