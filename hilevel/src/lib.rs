@@ -23,7 +23,6 @@ use core::slice::from_raw_parts;
 use core::fmt::Write;
 use crate::device::PL011::UART0;
 
-
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct Context {
@@ -40,8 +39,8 @@ extern {
     fn main_P2();
     fn main_P3();
     fn main_P4();
-    static tos_P1: u32;
-    static tos_P2: u32;
+    static tos_P1: cty::c_void;
+    static tos_P2: cty::c_void;
 }
 
 
@@ -51,13 +50,12 @@ pub extern fn hilevel_handler_rst(ctx: *mut Context) {
     let state = state::init();
 
     unsafe {
-        let tos1 = &tos_P1 as *const u32;
-        let tos2 = &tos_P2 as *const u32;
+        let tos1 = &tos_P1 as *const cty::c_void;
+        let tos2 = &tos_P2 as *const cty::c_void;
 
         state.process_manager.create_process(1, tos1, main_P3);
         state.process_manager.create_process(2, tos2, main_P4);
     }
-
 
     unsafe {
         (*TIMER0).Timer1Load  = 0x00100000; // select period = 2^20 ticks ~= 1 sec

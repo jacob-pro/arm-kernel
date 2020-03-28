@@ -83,7 +83,7 @@ impl ProcessManager {
         self.executing = next; // update   executing process to P_{next}
     }
 
-    pub fn create_process(&mut self, pid: PID, tos: *const u32, main: unsafe extern fn()) {
+    pub fn create_process(&mut self, pid: PID, tos: *const cty::c_void, main: unsafe extern fn()) {
 
         self.table.insert(pid, ProcessControlBlock {
             pid: pid,

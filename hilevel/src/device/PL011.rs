@@ -35,11 +35,3 @@ impl Write for PL011 {
     }
 }
 
-impl PL011 {
-
-    #[allow(unused_must_use)]
-    pub fn write_ln(&mut self, s: &str) {
-        self.write_fmt(format_args!("{}\n", s));
-    }
-
-}

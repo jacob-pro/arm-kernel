@@ -1,5 +1,6 @@
 use crate::process::ProcessManager;
 use crate::device::PL011::UART0;
+use core::fmt::Write;
 
 #[derive(Default)]
 pub struct KernelState {
@@ -14,7 +15,7 @@ pub struct KernelState {
 static mut KERNEL_STATE: Option<KernelState> = None;
 
 pub fn init() -> &'static mut KernelState {
-    UART0().write_ln("Initialising kernel state");
+    writeln!(UART0(), "Initialising kernel state").ok();
     unsafe {
         if KERNEL_STATE.is_some() { panic!("State has already initialised") }
         KERNEL_STATE = Some(KernelState::default())
