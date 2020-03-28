@@ -33,3 +33,11 @@ impl Write for PL011 {
         Ok(())
     }
 }
+
+impl PL011 {
+
+    pub fn write_ln(&mut self, s: &str) -> Result<(), Error> {
+        self.write_fmt(format_args!("{}\n", s))
+    }
+
+}
