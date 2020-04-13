@@ -14,12 +14,12 @@ SECTIONS {
   .data : {                         *(.data        ) }
   /* place bss  segment(s)           */        
   .bss  : {                         *(.bss         ) }
-  /* create a heap for malloc (lab4) */
+  /* create a heap for malloc (lab4), 0x10000000 = 256 MiB */
   .heap : {
-        end    = .;
-    _heap_start = .;
-    .             = . + 0x00001000;
-    _heap_end    = .;
+          end = .;
+  _heap_start = .;
+  .           = . + 0x10000000;
+  _heap_end   = .;
   }
   /* required for something in libgcc called by Rust alloc */
   .ARM.exidx : {
@@ -29,13 +29,7 @@ SECTIONS {
   }
   /* align       address (per AAPCS) */
   .       = ALIGN( 8 );        
-  /* allocate stack for SVC/IRQ mode     */
+  /* allocate stack for SVC/IRQ interrupt mode     */
   .       = . + 0x00001000;  
   tos_int = .;
-  /* allocate stack for P1           */
-  .       = . + 0x00001000;
-  tos_P1  = .;
-  /* allocate stack for P2           */
-  .       = . + 0x00001000;
-  tos_P2  = .;
 }

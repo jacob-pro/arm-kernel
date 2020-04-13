@@ -1,20 +1,26 @@
+mod table;
+
 use crate::Context;
 use alloc::collections::BTreeMap;
 use crate::device::PL011::UART0;
 use core::fmt::Write;
 use alloc::string::ToString;
 use alloc::borrow::ToOwned;
+use alloc::vec::Vec;
+use core::slice;
+use crate::process::table::{ProcessTable, ProcessTableMethods};
 
 pub type PID = u32;
-const CPSR_USR: u32 = 0x50;
+
+const DEFAULT_STACK_BYTES: usize = 0x00001000; // = 4 KiB
 
 #[derive(Default)]
 pub struct ProcessManager {
-    // BTreeMap will be fast for ordered integer keys
-    pub table: BTreeMap<PID, ProcessControlBlock>,
+    pub table: ProcessTable,
     pub executing: Option<PID>,
 }
 
+#[derive(Debug, Clone)]
 pub enum ProcessStatus {
     Ready,
     Executing,
@@ -26,11 +32,31 @@ pub enum ScheduleSource {
     Reset,
 }
 
+#[derive(Debug, Clone)]
 pub struct ProcessControlBlock {
-    pub pid: PID,
     pub status: ProcessStatus,
-    pub top_of_stack: u32,
+    pub stack: Vec<u8>,
     pub context: Context,
+}
+
+const CPSR_USR: u32 = 0x50;
+
+impl ProcessControlBlock {
+
+    fn new(stack: Vec<u8>, main: unsafe extern fn()) -> ProcessControlBlock {
+        let tos = stack.last().expect("Stack needs to be longer than 0") as *const _;
+        ProcessControlBlock{
+            status: ProcessStatus::Ready,
+            stack,
+            context: Context {
+                cpsr: CPSR_USR,
+                pc: main as u32,
+                gpr: [0; 13],
+                sp: tos as u32,
+                lr: 0
+            }
+        }
+    }
 }
 
 
@@ -40,10 +66,10 @@ impl ProcessManager {
         match self.executing {
             Some(x) => {
 
-                if x == self.table[&0].pid {
+                if x == 0 {
                     self.dispatch( ctx, Some(0), 1 );  // context switch P_1 -> P_2
 
-                } else if x == self.table[&1].pid {
+                } else if x == 1 {
                     self.dispatch( ctx, Some(1), 0 );  // context switch P_2 -> P_1
                 }
             }
@@ -76,55 +102,21 @@ impl ProcessManager {
         self.executing = Some(next_pid); // update   executing process to P_{next}
     }
 
-    pub fn create_process(&mut self, tos: *const cty::c_void, main: unsafe extern fn()) {
+    pub fn create_process(&mut self, main: unsafe extern fn()) -> PID {
 
-        let process = ProcessControlBlock {
-            pid: self.new_pid(),
-            status: ProcessStatus::Ready,
-            top_of_stack: tos as u32,
-            context: Context {
-                cpsr: CPSR_USR,
-                pc: main as u32,
-                gpr: [0; 13],
-                sp: tos as u32,
-                lr: 0,
-            }
-        };
-
-        self.table.insert(process.pid, process);
-    }
-
-    fn new_pid(&self) -> PID {
-        match self.table.last_key_value().map(|x| x.0.to_owned()) {
-            Some(x) => {
-                if x < PID::MAX {
-                    // Increment of current largest PID
-                    return x + 1
-                } else {
-                    // Otherwise find first missing positive
-                    for i in 0..PID::MAX {
-                        if !self.table.contains_key(&i) { return i }
-                    }
-                    panic!("Process table full");
-                }
-            }
-            // If no PIDs exist start at 0
-            _ => {0}
-        }
+        let pid = self.table.new_pid();
+        let stack = uninit_bytes(DEFAULT_STACK_BYTES);
+        let process = ProcessControlBlock::new(stack, main);
+        self.table.insert(pid, process);
+        pid
     }
 
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::process::ProcessManager;
-
-    #[test]
-    fn new_pid_test() {
-
-        let pm = ProcessManager::default();
-        assert_eq!(pm.new_pid(), 0);
-        //assert_eq!(pm.new_pid(), 1);
-
-    }
+// A heap allocated byte array of length size. Values are uninitialised
+fn uninit_bytes(size: usize) -> Vec<u8> {
+    let mut stack: Vec<u8> = Vec::with_capacity(size);
+    unsafe { stack.set_len(size) };
+    stack
 }
+

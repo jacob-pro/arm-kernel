@@ -41,8 +41,6 @@ extern {
     fn main_P2();
     fn main_P3();
     fn main_P4();
-    static tos_P1: cty::c_void;
-    static tos_P2: cty::c_void;
 }
 
 
@@ -53,11 +51,8 @@ pub extern fn hilevel_handler_rst(ctx: *mut Context) {
     let state = state::init();
 
     unsafe {
-        let tos1 = &tos_P1 as *const cty::c_void;
-        let tos2 = &tos_P2 as *const cty::c_void;
-
-        state.process_manager.create_process(tos1, main_P3);
-        state.process_manager.create_process(tos2, main_P4);
+        state.process_manager.create_process(main_P3);
+        state.process_manager.create_process(main_P4);
     }
 
     unsafe {
