@@ -22,6 +22,7 @@ use bindings::GICD0;
 use core::slice::from_raw_parts;
 use core::fmt::Write;
 use crate::device::PL011::UART0;
+use crate::process::ScheduleSource;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -72,7 +73,7 @@ pub extern fn hilevel_handler_rst(ctx: *mut Context) {
         bindings::int_enable_irq();
     }
 
-    state.process_manager.schedule(ctx);
+    state.process_manager.schedule(ctx, ScheduleSource::Reset);
 }
 
 #[no_mangle]
@@ -87,7 +88,7 @@ pub extern fn hilevel_handler_irq(ctx: *mut Context) {
 
             PL011_putc(bindings::UART0, 'T' as u8, true);
             (*TIMER0).Timer1IntClr = 0x01;
-            state.process_manager.schedule(ctx);
+            state.process_manager.schedule(ctx, ScheduleSource::Timer);
         }
 
         (*GICC0).EOIR = id;
@@ -101,9 +102,7 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
     let state = state::get();
 
     match id {
-        0 => {
-            state.process_manager.schedule(ctx);
-        },
+        0 => {},
         1 => {
             let _file_descriptor = ctx.gpr[0];
             let start_ptr = ctx.gpr[1] as *const u8;
@@ -115,6 +114,8 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
         }
         _ => {}
     }
+
+    state.process_manager.schedule(ctx, ScheduleSource::Svc {id});
 }
 
 

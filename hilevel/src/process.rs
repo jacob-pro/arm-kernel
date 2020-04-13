@@ -1,8 +1,8 @@
 use crate::Context;
 use alloc::collections::BTreeMap;
-use core::char::from_digit;
-use crate::bindings::PL011_putc;
-use crate::bindings;
+use crate::device::PL011::UART0;
+use core::fmt::Write;
+use crate::alloc::string::ToString;
 
 pub type PID = u32;
 const CPSR_USR: u32 = 0x50;
@@ -18,6 +18,12 @@ pub enum ProcessStatus {
     Executing,
 }
 
+pub enum ScheduleSource {
+    Svc {id: u32},
+    Timer,
+    Reset,
+}
+
 pub struct ProcessControlBlock {
     pub pid: PID,
     pub status: ProcessStatus,
@@ -28,59 +34,44 @@ pub struct ProcessControlBlock {
 
 impl ProcessManager {
 
-    pub fn schedule(&mut self, ctx: &mut Context) {
+    pub fn schedule(&mut self, ctx: &mut Context, src: ScheduleSource) {
         match self.executing {
             Some(x) => {
 
                 if x == self.table[&1].pid {
-                    self.dispatch( ctx, Some(1), Some(2) );  // context switch P_1 -> P_2
-                    self.table.get_mut(&1).unwrap().status = ProcessStatus::Ready;             // update   execution status  of P_1
-                    self.table.get_mut(&2).unwrap().status = ProcessStatus::Executing;         // update   execution status  of P_2
+                    self.dispatch( ctx, Some(1), 2 );  // context switch P_1 -> P_2
 
                 } else if x == self.table[&2].pid {
-                    self.dispatch( ctx, Some(2), Some(1) );  // context switch P_2 -> P_1
-                    self.table.get_mut(&2).unwrap().status = ProcessStatus::Ready;             // update   execution status  of P_2
-                    self.table.get_mut(&1).unwrap().status = ProcessStatus::Executing;         // update   execution status  of P_1
+                    self.dispatch( ctx, Some(2), 1 );  // context switch P_2 -> P_1
                 }
             }
             None => {
-                self.dispatch( ctx, None, Some(1) );  // context switch P_1 -> P_2
-                self.table.get_mut(&1).unwrap().status = ProcessStatus::Executing;             // update   execution status  of P_1
-                self.table.get_mut(&2).unwrap().status = ProcessStatus::Ready;         // update   execution status  of P_2
+                self.dispatch( ctx, None, 1 );  // context switch P_1 -> P_2
             }
         }
     }
 
-    fn dispatch(&mut self, ctx: &mut Context, prev: Option<PID>, next: Option<PID>) {
-        let mut prev_pid = '?' as u8;
-        let mut next_pid = '?' as u8;
+    fn dispatch(&mut self, ctx: &mut Context, prev_pid: Option<PID>, next_pid: PID) {
 
-        match prev {
+        let prev_pid_str = match prev_pid {
             Some(x) => {
-                prev_pid = from_digit(x, 10).unwrap() as u8;
-                self.table.get_mut(&x).unwrap().context = *ctx;
+                let prev = self.table.get_mut(&x).unwrap();
+                prev.context = *ctx;
+                prev.status = ProcessStatus::Ready;
+                x.to_string()
             },
-            None => {}
-        }
+            None => {
+                "?".to_string()
+            }
+        };
 
-        match next {
-            Some(x) => {
-                next_pid = from_digit(x, 10).unwrap() as u8;
-                *ctx = self.table.get_mut(&x).unwrap().context;
-            },
-            None => {}
-        }
+        let next = self.table.get_mut(&next_pid).unwrap();
+        *ctx = next.context;
+        next.status = ProcessStatus::Executing;
 
-        unsafe {
-            PL011_putc( bindings::UART0, '[' as u8, true );
-            PL011_putc( bindings::UART0, prev_pid, true );
-            PL011_putc( bindings::UART0, '-' as u8, true );
-            PL011_putc( bindings::UART0, '>' as u8, true );
-            PL011_putc( bindings::UART0, next_pid, true );
-            PL011_putc( bindings::UART0, ']' as u8, true );
-        }
+        write!(UART0(), "[{}->{}]", prev_pid_str, next_pid).ok();
 
-        self.executing = next; // update   executing process to P_{next}
+        self.executing = Some(next_pid); // update   executing process to P_{next}
     }
 
     pub fn create_process(&mut self, pid: PID, tos: *const cty::c_void, main: unsafe extern fn()) {
