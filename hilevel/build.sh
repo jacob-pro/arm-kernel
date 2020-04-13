@@ -12,6 +12,12 @@ if ! [ -x "$(command -v clang)" ]; then
   exit 1
 fi
 
+# Sometimes clang-sys detects llvm-private instead which is not compatible
+if [ -x "$(command -v yum)" ] && [ -x "$(yum list installed llvm-private)" ]; then
+  echo 'Warning: Detected yum package llvm-private. Attempting alternative llvm path...'
+  export LIBCLANG_PATH=$(llvm-config --libdir)
+fi
+
 # armv7a currently only available in Rust 1.42
 # https://github.com/rust-lang/rust/pull/68253
 # allocator_api currently unstable
