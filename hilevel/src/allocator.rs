@@ -23,6 +23,7 @@ unsafe impl GlobalAlloc for NewLibAlloc {
     }
 }
 
+#[cfg(not(test))]
 #[global_allocator]
 static A: NewLibAlloc = NewLibAlloc;
 

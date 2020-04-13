@@ -96,7 +96,6 @@ pub extern fn hilevel_handler_irq(ctx: *mut Context) {
 
         (*GICC0).EOIR = id;
     }
-
 }
 
 #[no_mangle]
@@ -115,6 +114,7 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
             slice.iter().for_each(|b| {
                 unsafe { PL011_putc( bindings::UART0, *b, true ) };
             });
+            ctx.gpr[0] = slice.len() as u32;
         }
         _ => {}
     }
