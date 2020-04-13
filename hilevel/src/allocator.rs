@@ -26,6 +26,7 @@ unsafe impl GlobalAlloc for NewLibAlloc {
 #[global_allocator]
 static A: NewLibAlloc = NewLibAlloc;
 
+#[cfg(not(test))]
 #[alloc_error_handler]
 fn alloc_error(_: Layout) -> ! {
     panic!("Allocation error")

@@ -25,6 +25,7 @@ fn bindgen() {
         .clang_args(header_includes_args)
         .use_core()
         .ctypes_prefix("cty")
+        .layout_tests(false)
         .header("../core/bindings.h")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         .generate()
