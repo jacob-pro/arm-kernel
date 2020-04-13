@@ -35,13 +35,7 @@ Inside MSYS:
 - `pacman -S python3-pip`
 - `pip install compiledb`
 
-We need to replace the paths to work in Windows
-```
-compiledb -n -o - make\
- | sed 's&"directory": "/c/&"directory": "c:/&'\
- | sed 's&/bin/arm-eabi-gcc&/bin/arm-eabi-gcc.exe&'\
- > compile_commands.json
-```
+Run `compiledb.sh` to generate `compile_commands.json`
 
 Load CompilationDB project in Clion\
 https://www.jetbrains.com/help/clion/compilation-database.html
