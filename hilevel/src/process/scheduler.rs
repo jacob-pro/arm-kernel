@@ -1,4 +1,4 @@
-use crate::process::{ProcessControlBlock, WeakPcbRef, StrongPcbRef, ScheduleSource};
+use crate::process::{ProcessControlBlock, WeakPcbRef, StrongPcbRef, ScheduleSource, ProcessStatus};
 use alloc::rc::{Rc, Weak};
 use alloc::collections::LinkedList;
 use core::cell::RefMut;
@@ -8,13 +8,14 @@ const NUMBER_OF_QUEUES: usize = 8;
 #[derive(Default)]
 pub struct MLFQ {
     queues: [LinkedList<WeakPcbRef>; NUMBER_OF_QUEUES],
-    executing: Option<StrongPcbRef>,
+    pub executing: Option<StrongPcbRef>,
 }
 
 
 impl MLFQ {
 
     pub fn insert_process(&mut self, process: WeakPcbRef) {
+        // Add new process to top queue
         self.queues[0].push_back(process);
     }
 
@@ -35,6 +36,17 @@ impl MLFQ {
         }
 
         self.executing = Some(next); // update   executing process to P_{next}
+    }
+
+    fn pop_front(&mut self, queue: &mut LinkedList<WeakPcbRef>) -> Option<StrongPcbRef> {
+        while !queue.is_empty() {
+            let popped = queue.pop_front().unwrap();
+            match Weak::upgrade(&popped) {
+                Some(strong) => {return Some(strong)}
+                _ => {}
+            }
+        }
+        None
     }
 
 }

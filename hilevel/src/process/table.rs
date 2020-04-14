@@ -3,18 +3,31 @@ use crate::process::{PID, ProcessControlBlock};
 use alloc::borrow::ToOwned;
 use alloc::rc::Rc;
 use core::cell::RefCell;
+use core::ops;
 
 // BTreeMap will be fast for ordered integer keys
-pub type ProcessTable = BTreeMap<PID, Rc<RefCell<ProcessControlBlock>>>;
+type Internal = BTreeMap<PID, Rc<RefCell<ProcessControlBlock>>>;
 
-pub trait ProcessTableMethods {
-    fn new_pid(&self) -> PID;
+#[derive(Default)]
+pub struct ProcessTable(Internal);
+
+impl ops::Deref for ProcessTable {
+    type Target = Internal;
+    fn deref(&self) -> &Internal {
+        &self.0
+    }
 }
 
-impl ProcessTableMethods for ProcessTable {
+impl ops::DerefMut for ProcessTable {
+    fn deref_mut(&mut self) -> &mut Internal {
+        &mut self.0
+    }
+}
 
-    fn new_pid(&self) -> PID {
-        match self.last_key_value().map(|x| x.0.to_owned()) {
+impl ProcessTable {
+
+    pub fn new_pid(&self) -> PID {
+        match self.0.last_key_value().map(|x| x.0.to_owned()) {
             Some(x) => {
                 if x < PID::MAX {
                     // Increment of current largest PID - Fast
@@ -22,7 +35,7 @@ impl ProcessTableMethods for ProcessTable {
                 } else {
                     // Otherwise find first missing positive - Slower
                     for i in 0..PID::MAX {
-                        if !self.contains_key(&i) { return i }
+                        if !self.0.contains_key(&i) { return i }
                     }
                     panic!("Process table full"); // 2^32 is a lot of processes
                 }
@@ -36,7 +49,6 @@ impl ProcessTableMethods for ProcessTable {
 #[cfg(test)]
 mod tests {
     use crate::process::table::ProcessTable;
-    use crate::process::table::ProcessTableMethods;
     use alloc::vec::Vec;
     use crate::process::{ProcessControlBlock, PID};
     use core::cell::RefCell;

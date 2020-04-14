@@ -4,9 +4,9 @@ mod scheduler;
 use crate::Context;
 use crate::device::PL011::UART0;
 use core::fmt::Write;
-use alloc::string::ToString;
+use alloc::string::{ToString, String};
 use alloc::vec::Vec;
-use crate::process::table::{ProcessTable, ProcessTableMethods};
+use crate::process::table::ProcessTable;
 use alloc::rc::{Rc, Weak};
 use core::cell::{RefCell, RefMut};
 use crate::process::scheduler::MLFQ;
@@ -21,6 +21,7 @@ pub struct ProcessManager {
     scheduler: MLFQ,
 }
 
+#[derive(PartialEq)]
 pub enum ProcessStatus {
     Ready,
     Executing,
@@ -68,6 +69,7 @@ impl ProcessControlBlock {
 
 impl ProcessManager {
 
+    // Create a new process
     pub fn create_process(&mut self, main: unsafe extern fn()) -> PID {
         let pid = self.table.new_pid();
         let stack = uninit_bytes(DEFAULT_STACK_BYTES);
@@ -75,6 +77,20 @@ impl ProcessManager {
         self.table.insert(pid, Rc::clone(&process));
         self.scheduler.insert_process(Rc::downgrade(&process));
         pid
+    }
+
+    // Kills another process
+    pub fn kill_process(&mut self, pid: PID) -> Result<(), String> {
+        let x = self.table.remove(&pid).ok_or("PID not found")?;
+        x.borrow_mut().status = ProcessStatus::Terminated;;
+        Ok(())
+    }
+
+    // Exits current process
+    pub fn exit(&mut self) {
+        let mut x = self.scheduler.executing.as_ref().map(|x| x.borrow_mut()).unwrap();
+        x.status = ProcessStatus::Terminated;
+        self.table.remove(&x.pid);
     }
 
     #[inline(always)]
