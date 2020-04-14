@@ -24,7 +24,7 @@ impl ProcessTableMethods for ProcessTable {
                     for i in 0..PID::MAX {
                         if !self.contains_key(&i) { return i }
                     }
-                    panic!("Process table full");
+                    panic!("Process table full"); // 2^32 is a lot of processes
                 }
             }
             // If no PIDs exist start at 0

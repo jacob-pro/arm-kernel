@@ -48,7 +48,8 @@ const CPSR_USR: u32 = 0x50;
 impl ProcessControlBlock {
 
     fn new(pid: PID, stack: Vec<u8>, main: unsafe extern fn()) -> ProcessControlBlock {
-        let tos = stack.last().expect("Stack needs to be longer than 0") as *const _;
+        // last() because the stack grows downwards from higher -> lower addresses
+        let tos = stack.last().expect("Stack needs to be larger than 0") as *const _;
         ProcessControlBlock{
             pid,
             status: ProcessStatus::Ready,
