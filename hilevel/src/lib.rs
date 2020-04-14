@@ -37,8 +37,8 @@ pub struct Context {
 
 #[allow(non_upper_case_globals)]
 extern {
-    fn main_P1();
-    fn main_P2();
+    //fn main_P1();
+    //fn main_P2();
     fn main_P3();
     fn main_P4();
 }
@@ -50,10 +50,8 @@ pub extern fn hilevel_handler_rst(ctx: *mut Context) {
     let ctx = unsafe { &mut *ctx};
     let state = state::init();
 
-    unsafe {
-        state.process_manager.create_process(main_P3);
-        state.process_manager.create_process(main_P4);
-    }
+    state.process_manager.create_process(main_P3);
+    state.process_manager.create_process(main_P4);
 
     unsafe {
         (*TIMER0).Timer1Load  = 0x00100000; // select period = 2^20 ticks ~= 1 sec
