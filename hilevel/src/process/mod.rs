@@ -93,10 +93,25 @@ impl ProcessManager {
         self.table.remove(&x.pid);
     }
 
-    #[inline(always)]
     pub fn schedule(&mut self, ctx: &mut Context, src: ScheduleSource) {
-        self.scheduler.schedule(src, |a, b| {
-            dispatch(ctx, a, b);
+        self.scheduler.schedule(src, |prev, mut next| {
+
+            let prev_pid_str = match prev {
+                Some(mut x) => {
+                    x.context = *ctx;
+                    x.status = ProcessStatus::Ready;
+                    x.pid.to_string()
+                },
+                None => {
+                    "?".to_string()
+                }
+            };
+
+            *ctx = next.context;
+            next.status = ProcessStatus::Executing;
+
+            write!(UART0(), "[{}->{}]", prev_pid_str, next.pid).ok();
+
         });
     }
 
@@ -107,23 +122,4 @@ fn uninit_bytes(size: usize) -> Vec<u8> {
     let mut stack: Vec<u8> = Vec::with_capacity(size);
     unsafe { stack.set_len(size) };
     stack
-}
-
-fn dispatch(ctx: &mut Context, prev: Option<RefMut<ProcessControlBlock>>, mut next: RefMut<ProcessControlBlock>) {
-
-    let prev_pid_str = match prev {
-        Some(mut x) => {
-            x.context = *ctx;
-            x.status = ProcessStatus::Ready;
-            x.pid.to_string()
-        },
-        None => {
-            "?".to_string()
-        }
-    };
-
-    *ctx = next.context;
-    next.status = ProcessStatus::Executing;
-
-    write!(UART0(), "[{}->{}]", prev_pid_str, next.pid).ok();
 }

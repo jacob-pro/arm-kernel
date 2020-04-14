@@ -1,28 +1,29 @@
 use crate::process::{ProcessControlBlock, WeakPcbRef, StrongPcbRef, ScheduleSource, ProcessStatus};
 use alloc::rc::{Rc, Weak};
 use alloc::collections::LinkedList;
-use core::cell::RefMut;
+use core::cell::{RefMut, RefCell};
+use crate::util::WeakQueue;
 
 const NUMBER_OF_QUEUES: usize = 8;
 
 #[derive(Default)]
 pub struct MLFQ {
-    queues: [LinkedList<WeakPcbRef>; NUMBER_OF_QUEUES],
+    queues: [WeakQueue<RefCell<ProcessControlBlock>>; NUMBER_OF_QUEUES],
     pub executing: Option<StrongPcbRef>,
 }
 
 
 impl MLFQ {
 
+    // Add new process to top queue, does not take ownership
     pub fn insert_process(&mut self, process: WeakPcbRef) {
-        // Add new process to top queue
         self.queues[0].push_back(process);
     }
 
     pub fn schedule<F>(&mut self, _src: ScheduleSource, mut dispatch: F)
         where F: FnMut(Option<RefMut<ProcessControlBlock>>, RefMut<ProcessControlBlock>)
     {
-        let next = Weak::upgrade(&self.queues[0].pop_front().unwrap()).unwrap();
+        let next = self.queues[0].pop_front().unwrap();
         self.queues[0].push_back(Rc::downgrade(&next));
 
         match &self.executing {
@@ -36,17 +37,6 @@ impl MLFQ {
         }
 
         self.executing = Some(next); // update   executing process to P_{next}
-    }
-
-    fn pop_front(&mut self, queue: &mut LinkedList<WeakPcbRef>) -> Option<StrongPcbRef> {
-        while !queue.is_empty() {
-            let popped = queue.pop_front().unwrap();
-            match Weak::upgrade(&popped) {
-                Some(strong) => {return Some(strong)}
-                _ => {}
-            }
-        }
-        None
     }
 
 }

@@ -14,6 +14,7 @@ mod allocator;
 mod device;
 mod state;
 mod process;
+mod util;
 
 use core::panic::PanicInfo;
 use bindings::PL011_putc;
@@ -50,9 +51,6 @@ pub extern fn hilevel_handler_rst(ctx: *mut Context) {
     let ctx = unsafe { &mut *ctx};
     let state = state::init();
 
-    state.process_manager.create_process(main_P3);
-    state.process_manager.create_process(main_P4);
-
     unsafe {
         (*TIMER0).Timer1Load  = 0x00100000; // select period = 2^20 ticks ~= 1 sec
         (*TIMER0).Timer1Ctrl  = 0x00000002; // select 32-bit   timer
@@ -68,6 +66,8 @@ pub extern fn hilevel_handler_rst(ctx: *mut Context) {
         bindings::int_enable_irq();
     }
 
+    state.process_manager.create_process(main_P3);
+    state.process_manager.create_process(main_P4);
     state.process_manager.schedule(ctx, ScheduleSource::Reset);
 }
 
