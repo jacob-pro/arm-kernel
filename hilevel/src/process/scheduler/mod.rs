@@ -20,6 +20,7 @@ struct Current {
 }
 
 impl Current {
+
     fn new(process: StrongPcbRef, queue: StrongQueueRef) -> Current {
         Current {
             process,
@@ -27,6 +28,7 @@ impl Current {
             run_count: 1
         }
     }
+
     fn incr_run_count(&mut self) {
         self.run_count = self.run_count + 1;
     }
@@ -75,26 +77,39 @@ impl MLFQScheduler {
             // Timer preemption
             ScheduleSource::Timer => {
                 let current = self.current.as_mut().unwrap();
-                // If it is allowed to run for more time don't do anything
+                let current_process = Rc::clone(&current.process);
+
+                // If it is allowed to run for more time don't stop it, just increment count
                 if current.run_count < Queue::quantum(&(*current.queue).borrow()) {
                     current.incr_run_count();
                 } else {
-                    // Move to lower queue
+                    // Otherwise move to lower queue
                     let below = LinkedQueues::below(&current.queue).unwrap_or(Rc::clone(&current.queue));
                     below.borrow_mut().push_back(Rc::downgrade(&current.process));
-                    let prev = Rc::clone(&current.process);
+                    // And dispatch the next top process
                     let next = self.next_ready();
-                    dispatch(Some((*prev).borrow_mut()), (*next.0).borrow_mut());
+                    dispatch(Some((*current_process).borrow_mut()), (*next.0).borrow_mut());
                     self.current = Some(Current::new(next.0, next.1));
                 }
             },
 
             ScheduleSource::Svc { id: id } => {
-                //let current = self.executing.unwrap();
+                let current = self.current.as_mut().unwrap();
+                let current_process = Rc::clone(&current.process);
 
+                // If below max quantum count, and not SYS_YIELD then promote, otherwise stay in same queue
+                if current.run_count < Queue::quantum(&(*current.queue).borrow()) {
+                    LinkedQueues::above(&current.queue).unwrap_or(Rc::clone(&current.queue))
+                } else {
+                    Rc::clone(&current.queue)
+                }.borrow_mut().push_back(Rc::downgrade(&current.process));
+
+                // Dispatch the next top process
+                let next = self.next_ready();
+                dispatch(Some((*current_process).borrow_mut()), (*next.0).borrow_mut());
+                self.current = Some(Current::new(next.0, next.1));
             }
         }
-
     }
 
     pub fn current_process(&self) -> StrongPcbRef {

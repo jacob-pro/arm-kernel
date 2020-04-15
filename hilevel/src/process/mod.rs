@@ -80,6 +80,7 @@ impl ProcessManager {
     }
 
     // Kills another process
+    // We only need to remove from process table, the scheduler only keeps a weak reference
     pub fn kill_process(&mut self, pid: PID) -> Result<(), String> {
         let x = self.table.remove(&pid).ok_or("PID not found")?;
         x.borrow_mut().status = ProcessStatus::Terminated;
