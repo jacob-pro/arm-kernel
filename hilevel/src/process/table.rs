@@ -13,13 +13,13 @@ pub struct ProcessTable(Internal);
 
 impl ops::Deref for ProcessTable {
     type Target = Internal;
-    fn deref(&self) -> &Internal {
+    fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
 impl ops::DerefMut for ProcessTable {
-    fn deref_mut(&mut self) -> &mut Internal {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }

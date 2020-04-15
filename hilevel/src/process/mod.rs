@@ -9,7 +9,7 @@ use alloc::vec::Vec;
 use crate::process::table::ProcessTable;
 use alloc::rc::{Rc, Weak};
 use core::cell::{RefCell, RefMut};
-use crate::process::scheduler::MLFQ;
+use crate::process::scheduler::MLFQScheduler;
 
 pub type PID = u32;
 
@@ -18,7 +18,7 @@ const DEFAULT_STACK_BYTES: usize = 0x00001000; // = 4 KiB
 #[derive(Default)]
 pub struct ProcessManager {
     table: ProcessTable,
-    scheduler: MLFQ,
+    scheduler: MLFQScheduler,
 }
 
 #[derive(PartialEq)]
@@ -82,15 +82,15 @@ impl ProcessManager {
     // Kills another process
     pub fn kill_process(&mut self, pid: PID) -> Result<(), String> {
         let x = self.table.remove(&pid).ok_or("PID not found")?;
-        x.borrow_mut().status = ProcessStatus::Terminated;;
+        x.borrow_mut().status = ProcessStatus::Terminated;
         Ok(())
     }
 
     // Exits current process
     pub fn exit(&mut self) {
-        let mut x = self.scheduler.executing.as_ref().map(|x| x.borrow_mut()).unwrap();
-        x.status = ProcessStatus::Terminated;
-        self.table.remove(&x.pid);
+        let x = self.scheduler.current_process();
+        x.borrow_mut().status = ProcessStatus::Terminated;
+        self.table.remove(&x.borrow().pid);
     }
 
     pub fn schedule(&mut self, ctx: &mut Context, src: ScheduleSource) {
