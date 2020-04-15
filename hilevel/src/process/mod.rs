@@ -38,9 +38,9 @@ pub type StrongPcbRef = Rc<RefCell<ProcessControlBlock>>;
 pub type WeakPcbRef = Weak<RefCell<ProcessControlBlock>>;
 
 pub struct ProcessControlBlock {
-    pub pid: PID,
-    pub status: ProcessStatus,
-    pub stack: Vec<u8>,
+    pid: PID,
+    status: ProcessStatus,
+    stack: Vec<u8>,
     context: Context,
 }
 
