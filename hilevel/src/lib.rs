@@ -25,6 +25,8 @@ use core::slice::from_raw_parts;
 use core::fmt::Write;
 use crate::device::PL011::UART0;
 use crate::process::ScheduleSource;
+use num_derive::FromPrimitive;
+use num_traits::FromPrimitive;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -80,16 +82,24 @@ pub extern fn hilevel_handler_irq(ctx: *mut Context) {
 
     unsafe {
         let id: u32 = (*GICC0).IAR;
-
         if id == bindings::GIC_SOURCE_TIMER0 {
-
-            PL011_putc(bindings::UART0, 'T' as u8, true);
             (*TIMER0).Timer1IntClr = 0x01;
             state.process_manager.schedule(ctx, ScheduleSource::Timer);
         }
-
         (*GICC0).EOIR = id;
     }
+}
+
+#[derive(FromPrimitive, PartialEq)]
+pub enum SysCall {
+    Yield = 0,
+    Write = 1,
+    Read = 2,
+    Fork = 3,
+    Exit = 4,
+    Exec = 5,
+    Kill = 6,
+    Nice = 7,
 }
 
 #[no_mangle]
@@ -98,22 +108,28 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
     let ctx = unsafe { &mut *ctx};
     let state = state::get();
 
-    match id {
-        0 => {},
-        1 => {
-            let _file_descriptor = ctx.gpr[0];
-            let start_ptr = ctx.gpr[1] as *const u8;
-            let length = ctx.gpr[2] as usize;
-            let slice = unsafe { from_raw_parts(start_ptr, length) };
-            slice.iter().for_each(|b| {
-                unsafe { PL011_putc( bindings::UART0, *b, true ) };
-            });
-            ctx.gpr[0] = slice.len() as u32;
+    FromPrimitive::from_u32(id).map(|id| {
+        match id {
+            SysCall::Yield => {}
+            SysCall::Write => {
+                let _file_descriptor = ctx.gpr[0];
+                let start_ptr = ctx.gpr[1] as *const u8;
+                let length = ctx.gpr[2] as usize;
+                let slice = unsafe { from_raw_parts(start_ptr, length) };
+                slice.iter().for_each(|b| {
+                    unsafe { PL011_putc( bindings::UART0, *b, true ) };
+                });
+                ctx.gpr[0] = slice.len() as u32;
+            }
+            SysCall::Read => {}
+            SysCall::Fork => {}
+            SysCall::Exit => {}
+            SysCall::Exec => {}
+            SysCall::Kill => {}
+            SysCall::Nice => {}
         }
-        _ => {}
-    }
-
-    state.process_manager.schedule(ctx, ScheduleSource::Svc {id});
+        state.process_manager.schedule(ctx, ScheduleSource::Svc {id});
+    });
 }
 
 

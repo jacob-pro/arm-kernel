@@ -74,7 +74,7 @@ mod tests {
         table.insert(5, pcb.clone());
         assert_eq!(table.new_pid(), 6);
 
-        // A table that has been filled up, should loop back around
+        // A table that has been filled up, should loop back around and find first gap after 0
         table.insert(PID::MAX, pcb.clone());
         assert_eq!(table.new_pid(), 1);
     }

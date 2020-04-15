@@ -7,8 +7,7 @@ use alloc::rc::{Weak, Rc};
 pub type StrongQueueRef = Rc<RefCell<Queue>>;
 type QueueInternal = WeakQueue<RefCell<ProcessControlBlock>>;
 
-// Inverted Strong/Weak Above/Below to prevent reference cycle
-
+// Both above and below can't be strong otherwise there would be a reference cycle
 pub struct Queue {
     above: Option<Weak<RefCell<Queue>>>,
     internal: QueueInternal,
@@ -66,8 +65,7 @@ impl Default for MultiLevelQueue {
     fn default() -> Self {
 
         // Create 4 queues
-        // Each of them have references to the queue above and below
-
+        // Each of them have references to the queue above
         let top = Rc::new(RefCell::new(Queue {
             above: None,
             internal: Default::default(),
@@ -93,6 +91,7 @@ impl Default for MultiLevelQueue {
             quantum: 16
         }));
 
+        // Link the queues to the ones below
         let mut i = bottom;
         while i.borrow_mut().above.is_some() {
             let above = i.borrow().above.as_ref().map(|x| Weak::upgrade(x).unwrap()).unwrap();

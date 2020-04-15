@@ -1,14 +1,14 @@
 mod table;
 mod scheduler;
 
-use crate::Context;
+use crate::{Context, SysCall};
 use crate::device::PL011::UART0;
 use core::fmt::Write;
 use alloc::string::{ToString, String};
 use alloc::vec::Vec;
 use crate::process::table::ProcessTable;
 use alloc::rc::{Rc, Weak};
-use core::cell::{RefCell, RefMut};
+use core::cell::RefCell;
 use crate::process::scheduler::MLFQScheduler;
 
 pub type PID = u32;
@@ -29,7 +29,7 @@ pub enum ProcessStatus {
 }
 
 pub enum ScheduleSource {
-    Svc {id: u32},
+    Svc {id: SysCall},
     Timer,
     Reset,
 }
@@ -81,14 +81,14 @@ impl ProcessManager {
 
     // Kills another process
     // We only need to remove from process table, the scheduler only keeps a weak reference
-    pub fn kill_process(&mut self, pid: PID) -> Result<(), String> {
+    pub fn _kill_process(&mut self, pid: PID) -> Result<(), String> {
         let x = self.table.remove(&pid).ok_or("PID not found")?;
         x.borrow_mut().status = ProcessStatus::Terminated;
         Ok(())
     }
 
     // Exits current process
-    pub fn exit(&mut self) {
+    pub fn _exit(&mut self, _code: u32) {
         let x = self.scheduler.current_process();
         x.borrow_mut().status = ProcessStatus::Terminated;
         self.table.remove(&x.borrow().pid);
@@ -112,7 +112,6 @@ impl ProcessManager {
             next.status = ProcessStatus::Executing;
 
             write!(UART0(), "[{}->{}]", prev_pid_str, next.pid).ok();
-
         });
     }
 
