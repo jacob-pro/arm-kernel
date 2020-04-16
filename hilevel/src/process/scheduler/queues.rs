@@ -1,7 +1,7 @@
 use core::ops;
 use crate::util::WeakQueue;
-use core::cell::RefCell;
-use crate::process::ProcessControlBlock;
+use core::cell::{RefCell, Ref};
+use crate::process::{ProcessControlBlock, StrongPcbRef};
 use alloc::rc::{Weak, Rc};
 
 pub type StrongQueueRef = Rc<RefCell<Queue>>;
@@ -56,9 +56,37 @@ pub struct MultiLevelQueue {
 }
 
 impl MultiLevelQueue {
+
     pub fn top_queue(&self) -> StrongQueueRef {
         Rc::clone(&self.top)
     }
+
+    // Search queues for process
+    pub fn first_process<F>(&mut self, filter: F) -> Option<(StrongPcbRef, StrongQueueRef)>
+        where F: Fn(Ref<ProcessControlBlock>)->bool
+    {
+        // Iterate from High to Lower queues
+        let mut queue_ref = self.top_queue();
+        loop {
+            let mut queue = queue_ref.borrow_mut();
+            for _ in 0..queue.len() {
+                let popped = queue.pop_front().unwrap();
+                if filter(popped.borrow()) {
+                    return Some((popped, Rc::clone(&queue_ref)))
+                } else {
+                    queue.push_back(Rc::downgrade(&popped));
+                }
+            }
+            drop(queue);
+            let below = LinkedQueues::below(&queue_ref);
+            match below {
+                Some(x) => {queue_ref = x},
+                None => {break},  // There are no lower queues to search
+            }
+        }
+        None
+    }
+
 }
 
 impl Default for MultiLevelQueue {

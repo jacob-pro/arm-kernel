@@ -4,7 +4,7 @@ use crate::process::{ProcessControlBlock, WeakPcbRef, StrongPcbRef, ScheduleSour
 use alloc::rc::Rc;
 use queues::{MultiLevelQueue, LinkedQueues, StrongQueueRef};
 use crate::process::scheduler::queues::Queue;
-use core::cell::RefMut;
+use core::cell::{RefMut, Ref};
 use crate::SysCall;
 
 
@@ -35,7 +35,7 @@ impl Current {
     }
 
     fn incr_run_count(&mut self) {
-        self.run_count = self.run_count + 1;
+        self.run_count = self.run_count.saturating_add(1);         // Don't overflow
     }
 }
 
@@ -46,25 +46,6 @@ impl MLFQScheduler {
         self.queues.top_queue().borrow_mut().push_back(process)
     }
 
-    //Get the next process from the queues
-    fn next_ready(&mut self) -> (StrongPcbRef, StrongQueueRef) {
-
-        // Iterate from High to Lower queues
-        let mut queue_ref = self.queues.top_queue();
-        loop {
-            let mut borrow = queue_ref.borrow_mut();
-            for _ in 0..borrow.len() {
-                let popped = borrow.pop_front().unwrap();
-                if popped.clone().borrow_mut().status == ProcessStatus::Ready {
-                    return (popped, Rc::clone(&queue_ref))
-                } else {
-                    borrow.push_back(Rc::downgrade(&popped));
-                }
-            }
-            drop(borrow);
-            queue_ref = LinkedQueues::below(&queue_ref.clone()).expect("No process to execute");
-        }
-    }
 
     pub fn schedule<F>(&mut self, src: ScheduleSource, mut dispatch: F)
         where F: FnMut(Option<RefMut<ProcessControlBlock>>, RefMut<ProcessControlBlock>)
@@ -74,7 +55,7 @@ impl MLFQScheduler {
 
             // A reset means no process is currently running
             ScheduleSource::Reset => {
-                let next = self.next_ready();
+                let next = self.queues.first_process(ready).expect("No process found");
                 dispatch(None, (*next.0).borrow_mut());
                 self.current = Some(Current::new(next.0, next.1));
             }
@@ -82,26 +63,29 @@ impl MLFQScheduler {
             // Timer preemption
             ScheduleSource::Timer => {
                 let current = self.current.as_mut().unwrap();
-                let current_process = Rc::clone(&current.process);
+                current.incr_run_count();
 
-                // If it is allowed to run for more time don't stop it, just increment count
-                if current.run_count < Queue::quantum(&(*current.queue).borrow()) {
-                    current.incr_run_count();
-                } else {
-                    // Otherwise move to lower queue
-                    let below = LinkedQueues::below(&current.queue).unwrap_or(Rc::clone(&current.queue));
-                    below.borrow_mut().push_back(Rc::downgrade(&current.process));
-                    // And dispatch the next top process
-                    let next = self.next_ready();
-                    dispatch(Some((*current_process).borrow_mut()), (*next.0).borrow_mut());
-                    self.current = Some(Current::new(next.0, next.1));
+                // If it has been running longer than its count, try to move to next top process
+                if current.run_count >= Queue::quantum(&(*current.queue).borrow()) {
+
+                    // If there is no other process ready, then just skip
+                    let next = self.queues.first_process(ready).map(|(next_p, next_q)| {
+                        // Move the current to a lower/same queue
+                        let below = LinkedQueues::below(&current.queue).unwrap_or(Rc::clone(&current.queue));
+                        below.borrow_mut().push_back(Rc::downgrade(&current.process));
+                        dispatch(Some((*current.process).borrow_mut()), (*next_p).borrow_mut());
+                        Some(Current::new(next_p, next_q))
+                    });
+                    next.map(|n| self.current = n);
+
                 }
             },
 
             ScheduleSource::Svc { id } => {
                 let current = self.current.as_mut().unwrap();
-                let current_process = Rc::clone(&current.process);
+                current.incr_run_count();
 
+                // Move current process onto the MultiLevelQueue
                 // If Sys Yield then move down queue
                 // If below max quantum count then move up queue
                 // Otherwise stay at same queue level
@@ -113,18 +97,22 @@ impl MLFQScheduler {
                     Rc::clone(&current.queue)
                 }.borrow_mut().push_back(Rc::downgrade(&current.process));
 
-                // Dispatch the process
-                let next = self.next_ready();
-                dispatch(Some((*current_process).borrow_mut()), (*next.0).borrow_mut());
+                // Dispatch the next process
+                let next = self.queues.first_process(ready).unwrap();
+                dispatch(Some((*current.process).borrow_mut()), (*next.0).borrow_mut());
                 self.current = Some(Current::new(next.0, next.1));
             }
         }
     }
 
     pub fn current_process(&self) -> StrongPcbRef {
-        self.current.as_ref().map(|x| x.process.clone()).unwrap()
+        self.current.as_ref().map(|x| Rc::clone(&x.process)).unwrap()
     }
 
+}
+
+fn ready(process: Ref<ProcessControlBlock>) -> bool {
+    process.status == ProcessStatus::Ready
 }
 
 #[cfg(test)]
