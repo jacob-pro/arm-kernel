@@ -114,16 +114,21 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
                 ctx.gpr[0] = slice.len() as u32;
             }
             SysCall::Read => {}
-            SysCall::Fork => {}
+            SysCall::Fork => {
+                let child_pid = state.process_manager.fork(ctx);
+                ctx.gpr[0] = child_pid;
+            }
             SysCall::Exit => {}
-            SysCall::Exec => {}
+            SysCall::Exec => {
+                let address = ctx.gpr[0];
+                state.process_manager.exec(ctx, address);
+            }
             SysCall::Kill => {}
             SysCall::Nice => {}
         }
         state.process_manager.dispatch(ctx, ScheduleSource::Svc {id});
     });
 }
-
 
 #[panic_handler]
 #[cfg(not(test))]

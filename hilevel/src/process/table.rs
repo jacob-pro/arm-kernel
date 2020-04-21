@@ -57,9 +57,8 @@ mod tests {
     #[test]
     fn new_pid_test() {
 
-        pub extern fn do_nothing() {}
-        let stack = (0..1).collect::<Vec<u8>>();
-        let pcb = ProcessControlBlock::new(0, stack, do_nothing);
+        let stack = Vec::new();
+        let pcb = ProcessControlBlock::new(0, stack, 0, 0);
         let pcb = Rc::new(RefCell::new(pcb));
 
         // An empty table first PID should be 0
