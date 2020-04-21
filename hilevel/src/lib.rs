@@ -40,12 +40,10 @@ pub struct Context {
 
 #[allow(non_upper_case_globals)]
 extern {
-    //fn main_P1();
-    //fn main_P2();
     fn main_P3();
     fn main_P4();
+    fn main_console();
 }
-
 
 #[no_mangle]
 #[cfg(not(test))]
@@ -71,7 +69,8 @@ pub extern fn hilevel_handler_rst(ctx: *mut Context) {
 
     state.process_manager.create_process(main_P3);
     state.process_manager.create_process(main_P4);
-    state.process_manager.schedule(ctx, ScheduleSource::Reset);
+    state.process_manager.create_process(main_console);
+    state.process_manager.dispatch(ctx, ScheduleSource::Reset);
 }
 
 #[no_mangle]
@@ -84,7 +83,7 @@ pub extern fn hilevel_handler_irq(ctx: *mut Context) {
         let id: u32 = (*GICC0).IAR;
         if id == bindings::GIC_SOURCE_TIMER0 {
             (*TIMER0).Timer1IntClr = 0x01;
-            state.process_manager.schedule(ctx, ScheduleSource::Timer);
+            state.process_manager.dispatch(ctx, ScheduleSource::Timer);
         }
         (*GICC0).EOIR = id;
     }
@@ -128,7 +127,7 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
             SysCall::Kill => {}
             SysCall::Nice => {}
         }
-        state.process_manager.schedule(ctx, ScheduleSource::Svc {id});
+        state.process_manager.dispatch(ctx, ScheduleSource::Svc {id});
     });
 }
 

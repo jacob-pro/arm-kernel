@@ -81,10 +81,9 @@ impl MultiLevelQueue {
             let below = LinkedQueues::below(&queue_ref);
             match below {
                 Some(x) => {queue_ref = x},
-                None => {break},  // There are no lower queues to search
+                None => {return None},  // There are no lower queues to search
             }
         }
-        None
     }
 
 }

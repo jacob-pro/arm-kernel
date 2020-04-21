@@ -94,7 +94,7 @@ impl ProcessManager {
         self.table.remove(&x.borrow().pid);
     }
 
-    pub fn schedule(&mut self, ctx: &mut Context, src: ScheduleSource) {
+    pub fn dispatch(&mut self, ctx: &mut Context, src: ScheduleSource) {
         self.scheduler.schedule(src, |prev, mut next| {
 
             let prev_pid_str = match prev {

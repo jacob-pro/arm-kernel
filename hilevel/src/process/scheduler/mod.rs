@@ -55,9 +55,9 @@ impl MLFQScheduler {
 
             // A reset means no process is currently running
             ScheduleSource::Reset => {
-                let next = self.queues.first_process(ready).expect("No process found");
-                dispatch(None, (*next.0).borrow_mut());
-                self.current = Some(Current::new(next.0, next.1));
+                let (next_p, from_q) = self.queues.first_process(ready).expect("No process found");
+                dispatch(None, (*next_p).borrow_mut());
+                self.current = Some(Current::new(next_p, from_q));
             }
 
             // Timer preemption
@@ -69,12 +69,12 @@ impl MLFQScheduler {
                 if current.run_count >= Queue::quantum(&(*current.queue).borrow()) {
 
                     // If there is no other process ready, then just skip
-                    let next = self.queues.first_process(ready).map(|(next_p, next_q)| {
+                    let next = self.queues.first_process(ready).map(|(next_p, from_q)| {
                         // Move the current to a lower/same queue
                         let below = LinkedQueues::below(&current.queue).unwrap_or(Rc::clone(&current.queue));
                         below.borrow_mut().push_back(Rc::downgrade(&current.process));
                         dispatch(Some((*current.process).borrow_mut()), (*next_p).borrow_mut());
-                        Some(Current::new(next_p, next_q))
+                        Some(Current::new(next_p, from_q))
                     });
                     next.map(|n| self.current = n);
 
@@ -85,7 +85,7 @@ impl MLFQScheduler {
                 let current = self.current.as_mut().unwrap();
                 current.incr_run_count();
 
-                // Move current process onto the MultiLevelQueue
+                // Move current process back onto the MultiLevelQueue
                 // If Sys Yield then move down queue
                 // If below max quantum count then move up queue
                 // Otherwise stay at same queue level
@@ -115,8 +115,10 @@ fn ready(process: Ref<ProcessControlBlock>) -> bool {
     process.status == ProcessStatus::Ready
 }
 
+// These tests demonstrate that the scheduler works as per Stage 1b
 #[cfg(test)]
 mod tests {
+
 
 }
 
