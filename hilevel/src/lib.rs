@@ -10,6 +10,7 @@ extern crate alloc;
 #[allow(non_snake_case)]
 #[allow(dead_code)]
 mod bindings;
+
 mod allocator;
 mod device;
 mod state;
@@ -21,6 +22,7 @@ use bindings::PL011_putc;
 use bindings::TIMER0;
 use bindings::GICC0;
 use bindings::GICD0;
+use bindings::main_console;
 use core::slice::from_raw_parts;
 use core::fmt::Write;
 use crate::device::PL011::UART0;
@@ -36,13 +38,6 @@ pub struct Context {
     pub gpr: [u32; 13usize],
     pub sp: u32,
     pub lr: u32,
-}
-
-#[allow(non_upper_case_globals)]
-extern {
-    fn main_P3();
-    fn main_P4();
-    fn main_console();
 }
 
 #[no_mangle]
@@ -67,8 +62,6 @@ pub extern fn hilevel_handler_rst(ctx: *mut Context) {
         bindings::int_enable_irq();
     }
 
-    //state.process_manager.create_process(main_P3);
-    //state.process_manager.create_process(main_P4);
     state.process_manager.create_process(main_console);
     state.process_manager.dispatch(ctx, ScheduleSource::Reset);
 }
@@ -143,8 +136,7 @@ fn handle_panic(info: &PanicInfo) -> ! {
 #[cfg(not(test))]
 pub extern fn abort() -> ! {
     unsafe {
-        // Disable to stop interrupts resuming execution
-        bindings::int_unable_irq();
+        bindings::int_unable_irq();  // Disable to stop interrupts resuming execution
         core::intrinsics::abort()
     }
 }

@@ -12,3 +12,5 @@
 // Include Newlib
 
 #include "stdlib.h"
+
+void main_console();
