@@ -46,3 +46,8 @@ https://www.jetbrains.com/help/clion/compilation-database.html
 - Use arm-eabi-gdb.exe
 - Set target remote `127.0.0.1:1234`
 - Set Symbol file `image.elf`
+
+#### Console
+
+Inside MSYS:
+`pacman -S  gnu-netcat`

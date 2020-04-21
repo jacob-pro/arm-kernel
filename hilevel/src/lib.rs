@@ -67,8 +67,8 @@ pub extern fn hilevel_handler_rst(ctx: *mut Context) {
         bindings::int_enable_irq();
     }
 
-    state.process_manager.create_process(main_P3);
-    state.process_manager.create_process(main_P4);
+    //state.process_manager.create_process(main_P3);
+    //state.process_manager.create_process(main_P4);
     state.process_manager.create_process(main_console);
     state.process_manager.dispatch(ctx, ScheduleSource::Reset);
 }

@@ -90,7 +90,8 @@ void main_console() {
 
     // step 1: write command prompt, then read command.
 
-    puts( "console$ ", 7 ); gets( cmd, MAX_CMD_CHARS );
+    // I changed n from 7 to 9
+    puts( "console$ ", 9 ); gets( cmd, MAX_CMD_CHARS );
 
     // step 2: tokenize command.
 
