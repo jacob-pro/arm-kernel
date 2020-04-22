@@ -139,6 +139,7 @@ impl ProcessManager {
         let mut borrowed = current.borrow_mut();
         borrowed.status = ProcessStatus::Terminated;
         self.table.remove(&borrowed.pid);
+        write!(UART0(), "[{} Exited]", borrowed.pid).ok();
     }
 
     pub fn dispatch(&mut self, ctx: &mut Context, src: ScheduleSource) {

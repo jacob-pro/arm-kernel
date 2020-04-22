@@ -70,26 +70,18 @@ impl MultiLevelQueue {
         where F: Fn(&ProcessControlBlock)->bool
     {
         // Iterate from High to Lower queues
-
-
-        let mut queue_ref = self.top_queue();
-        loop {
-            let mut queue = queue_ref.borrow_mut();
-            for _ in 0..queue.len() {
-                let popped = queue.pop_front().unwrap();
+        for queue in self.iter() {
+            let mut borrowed = queue.borrow_mut();
+            for _ in 0..borrowed.len() {
+                let popped = borrowed.pop_front().unwrap();
                 if filter(&popped.borrow()) {
-                    return Some((popped, Rc::clone(&queue_ref)))
+                    return Some((popped, Rc::clone(&queue)))
                 } else {
-                    queue.push_back(Rc::downgrade(&popped));
+                    borrowed.push_back(Rc::downgrade(&popped));
                 }
             }
-            drop(queue);
-            let below = LinkedQueues::below(&queue_ref);
-            match below {
-                Some(x) => {queue_ref = x},
-                None => {return None},  // There are no lower queues to search
-            }
         }
+        None
     }
 
     // Moves all processes to the top queue
