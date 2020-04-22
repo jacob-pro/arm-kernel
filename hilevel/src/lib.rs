@@ -115,10 +115,12 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
             }
             SysCall::Read => {}
             SysCall::Fork => {
-                let child_pid = state.process_manager.fork(ctx);
-                ctx.gpr[0] = child_pid;
+                ctx.gpr[0] = state.process_manager.fork(ctx);
             }
-            SysCall::Exit => {}
+            SysCall::Exit => {
+                let code = ctx.gpr[0];
+                state.process_manager.exit(code);
+            }
             SysCall::Exec => {
                 let address = ctx.gpr[0];
                 state.process_manager.exec(ctx, address);

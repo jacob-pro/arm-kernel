@@ -96,9 +96,7 @@ impl ProcessManager {
         pid
     }
 
-    // Kills another process
-    // We only need to remove from process table, the scheduler only keeps a weak reference
-    pub fn _kill_process(&mut self, pid: PID) -> Result<(), String> {
+    pub fn _signal_process(&mut self, pid: PID) -> Result<(), String> {
         let x = self.table.remove(&pid).ok_or("PID not found")?;
         x.borrow_mut().status = ProcessStatus::Terminated;
         Ok(())
@@ -124,7 +122,7 @@ impl ProcessManager {
     // Change current process to new PC address
     pub fn exec(&mut self, ctx: &mut Context, address: u32) {
         let current = self.scheduler.current_process();
-        let mut borrowed = current.borrow_mut();
+        let borrowed = current.borrow_mut();
         let tos = borrowed.stack.last().unwrap() as *const _;
         *ctx = Context {
             cpsr: CPSR_USR,
@@ -136,10 +134,11 @@ impl ProcessManager {
     }
 
     // Exits current process
-    pub fn _exit(&mut self, _code: u32) {
-        let x = self.scheduler.current_process();
-        x.borrow_mut().status = ProcessStatus::Terminated;
-        self.table.remove(&x.borrow().pid);
+    pub fn exit(&mut self, _code: u32) {
+        let current = self.scheduler.current_process();
+        let mut borrowed = current.borrow_mut();
+        borrowed.status = ProcessStatus::Terminated;
+        self.table.remove(&borrowed.pid);
     }
 
     pub fn dispatch(&mut self, ctx: &mut Context, src: ScheduleSource) {

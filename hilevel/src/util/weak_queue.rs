@@ -21,8 +21,13 @@ impl<T> WeakQueue<T> {
         None
     }
 
+    // Replace with iter
     pub fn len(&self) -> usize {
-        self.0.len()
+        self.0.iter().filter(|x| x.strong_count() > 0).count()
+    }
+
+    pub fn append(&mut self, other: &mut WeakQueue<T>) {
+        self.0.append(&mut other.0)
     }
 
 }

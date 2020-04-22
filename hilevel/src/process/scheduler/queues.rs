@@ -1,6 +1,6 @@
 use core::ops;
 use crate::util::WeakQueue;
-use core::cell::{RefCell, Ref};
+use core::cell::RefCell;
 use crate::process::{ProcessControlBlock, StrongPcbRef};
 use alloc::rc::{Weak, Rc};
 
@@ -52,7 +52,7 @@ impl Queue {
 }
 
 pub struct MultiLevelQueue {
-    top: Rc<RefCell<Queue>>
+    top: StrongQueueRef
 }
 
 impl MultiLevelQueue {
@@ -61,17 +61,23 @@ impl MultiLevelQueue {
         Rc::clone(&self.top)
     }
 
+    pub fn iter(&self) -> MultiLevelQueueIterator {
+        MultiLevelQueueIterator {start: Rc::clone(&self.top), current: None }
+    }
+
     // Search queues for process
     pub fn first_process<F>(&mut self, filter: F) -> Option<(StrongPcbRef, StrongQueueRef)>
-        where F: Fn(Ref<ProcessControlBlock>)->bool
+        where F: Fn(&ProcessControlBlock)->bool
     {
         // Iterate from High to Lower queues
+
+
         let mut queue_ref = self.top_queue();
         loop {
             let mut queue = queue_ref.borrow_mut();
             for _ in 0..queue.len() {
                 let popped = queue.pop_front().unwrap();
-                if filter(popped.borrow()) {
+                if filter(&popped.borrow()) {
                     return Some((popped, Rc::clone(&queue_ref)))
                 } else {
                     queue.push_back(Rc::downgrade(&popped));
@@ -83,6 +89,14 @@ impl MultiLevelQueue {
                 Some(x) => {queue_ref = x},
                 None => {return None},  // There are no lower queues to search
             }
+        }
+    }
+
+    // Moves all processes to the top queue
+    pub fn boost(&mut self) {
+        for queue in self.iter().skip(1) {
+            let x = &mut queue.borrow_mut().internal;
+            self.top.borrow_mut().internal.append(x)
         }
     }
 
@@ -118,7 +132,7 @@ impl Default for MultiLevelQueue {
             quantum: 16
         }));
 
-        // Link the queues to the ones below
+        // Link the queues to the ones below, by iterating upwards
         let mut i = bottom;
         while i.borrow_mut().above.is_some() {
             let above = i.borrow().above.as_ref().map(|x| Weak::upgrade(x).unwrap()).unwrap();
@@ -127,5 +141,28 @@ impl Default for MultiLevelQueue {
         }
 
         MultiLevelQueue { top }
+    }
+}
+
+
+pub struct MultiLevelQueueIterator {
+    start: StrongQueueRef,
+    current: Option<StrongQueueRef>,
+}
+
+// Iterates through queues downwards
+impl Iterator for MultiLevelQueueIterator {
+    type Item = StrongQueueRef;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.current = match &self.current {
+            None => {
+                Some(Rc::clone(&self.start))
+            },
+            Some(x) => {
+                Rc::clone(x).borrow().below.clone()
+            },
+        };
+        self.current.clone()
     }
 }

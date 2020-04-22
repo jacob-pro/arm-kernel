@@ -4,14 +4,15 @@ use crate::process::{ProcessControlBlock, WeakPcbRef, StrongPcbRef, ScheduleSour
 use alloc::rc::Rc;
 use queues::{MultiLevelQueue, LinkedQueues, StrongQueueRef};
 use crate::process::scheduler::queues::Queue;
-use core::cell::{RefMut, Ref};
 use crate::SysCall;
 
+const BOOST_QUANTUM: u32 = 50;
 
 #[derive(Default)]
 pub struct MLFQScheduler {
     queues: MultiLevelQueue,
     current: Option<Current>,
+    boost_tracker: u32,
 }
 
 // Info about the process which is currently being executed in user mode
@@ -41,6 +42,14 @@ impl Current {
 
 impl MLFQScheduler {
 
+    fn incr_boost_counter(&mut self) {
+        self.boost_tracker = self.boost_tracker + 1;
+        if self.boost_tracker > BOOST_QUANTUM {
+            self.queues.boost();
+            self.boost_tracker = 0
+        }
+    }
+
     // Add new process to top queue, scheduler does not keep ownership
     pub fn insert_process(&mut self, process: WeakPcbRef) {
         self.queues.top_queue().borrow_mut().push_back(process)
@@ -48,7 +57,7 @@ impl MLFQScheduler {
 
 
     pub fn schedule<F>(&mut self, src: ScheduleSource, mut dispatch: F)
-        where F: FnMut(Option<RefMut<ProcessControlBlock>>, RefMut<ProcessControlBlock>)
+        where F: FnMut(Option<&mut ProcessControlBlock>, &mut ProcessControlBlock)
     {
 
         match src {
@@ -56,12 +65,13 @@ impl MLFQScheduler {
             // A reset means no process is currently running
             ScheduleSource::Reset => {
                 let (next_p, from_q) = self.queues.first_process(ready).expect("No process found");
-                dispatch(None, (*next_p).borrow_mut());
+                dispatch(None, &mut (*next_p).borrow_mut());
                 self.current = Some(Current::new(next_p, from_q));
             }
 
             // Timer preemption
             ScheduleSource::Timer => {
+                self.incr_boost_counter();
                 let current = self.current.as_mut().unwrap();
                 current.incr_run_count();
 
@@ -73,7 +83,7 @@ impl MLFQScheduler {
                         // Move the current to a lower/same queue
                         let below = LinkedQueues::below(&current.queue).unwrap_or(Rc::clone(&current.queue));
                         below.borrow_mut().push_back(Rc::downgrade(&current.process));
-                        dispatch(Some((*current.process).borrow_mut()), (*next_p).borrow_mut());
+                        dispatch(Some(&mut current.process.borrow_mut()), &mut next_p.borrow_mut());
                         Some(Current::new(next_p, from_q))
                     });
                     next.map(|n| self.current = n);
@@ -98,9 +108,9 @@ impl MLFQScheduler {
                 }.borrow_mut().push_back(Rc::downgrade(&current.process));
 
                 // Dispatch the next process
-                let next = self.queues.first_process(ready).unwrap();
-                dispatch(Some((*current.process).borrow_mut()), (*next.0).borrow_mut());
-                self.current = Some(Current::new(next.0, next.1));
+                let (next_p, from_q) = self.queues.first_process(ready).unwrap();
+                dispatch(Some(&mut current.process.borrow_mut()), &mut next_p.borrow_mut());
+                self.current = Some(Current::new(next_p, from_q));
             }
         }
     }
@@ -111,7 +121,7 @@ impl MLFQScheduler {
 
 }
 
-fn ready(process: Ref<ProcessControlBlock>) -> bool {
+fn ready(process: &ProcessControlBlock) -> bool {
     process.status == ProcessStatus::Ready
 }
 
