@@ -57,10 +57,6 @@ pub struct MultiLevelQueue {
 
 impl MultiLevelQueue {
 
-    pub fn top_queue(&self) -> StrongQueueRef {
-        Rc::clone(&self.top)
-    }
-
     fn iter(&self) -> MultiLevelQueueIterator {
         MultiLevelQueueIterator {start: Rc::clone(&self.top), current: None }
     }
@@ -75,7 +71,7 @@ impl MultiLevelQueue {
     }
 
     // Search queues for first matching process
-    pub fn first_process<F>(&mut self, filter: F) -> Option<(StrongPcbRef, StrongQueueRef)>
+    pub fn pop_process<F>(&mut self, filter: F) -> Option<(StrongPcbRef, StrongQueueRef)>
         where F: Fn(&ProcessControlBlock)->bool
     {
         for queue in self.iter() {
@@ -96,6 +92,12 @@ impl MultiLevelQueue {
             let x = &mut queue.borrow_mut().internal;
             self.top.borrow_mut().internal.append(x)
         }
+    }
+
+    // Inserts a new process to the front of the first queue
+    pub fn insert_process(&mut self, process: StrongPcbRef) {
+        if self.contains(&process) { panic!("Process already in queue") }
+        self.top.borrow_mut().push_front(process)
     }
 
     // Removes a process if it is found in any queue

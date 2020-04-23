@@ -51,8 +51,7 @@ impl MLFQScheduler {
 
     // Add new process to the scheduler
     pub fn insert_process(&mut self, process: StrongPcbRef) {
-        if self.queues.contains(&process) { panic!("Process already found in scheduler") }
-        self.queues.top_queue().borrow_mut().push_front(process)
+        self.queues.insert_process(process)
     }
 
     // Remove a process from the scheduler
@@ -82,7 +81,7 @@ impl MLFQScheduler {
 
             // A reset means no process is currently running
             ScheduleSource::Reset => {
-                let (next_p, from_q) = self.queues.first_process(ready).expect("No process found");
+                let (next_p, from_q) = self.queues.pop_process(ready).expect("No process found");
                 dispatch(None, &mut (*next_p).borrow_mut());
                 self.current = Some(Current::new(next_p, from_q));
             }
@@ -97,7 +96,7 @@ impl MLFQScheduler {
                 if current.run_count >= Queue::quantum(&(*current.queue).borrow()) {
 
                     // If there is no other process ready, then just skip
-                    let next = self.queues.first_process(ready).map(|(next_p, from_q)| {
+                    let next = self.queues.pop_process(ready).map(|(next_p, from_q)| {
                         // Move the current to a lower/same queue
                         let below = LinkedQueues::below(&current.queue).unwrap_or(Rc::clone(&current.queue));
                         below.borrow_mut().push_back(Rc::clone(&current.process));
@@ -111,7 +110,7 @@ impl MLFQScheduler {
 
             ScheduleSource::Svc { id } => {
 
-                let (next_p, from_q) = self.queues.first_process(ready).unwrap();
+                let (next_p, from_q) = self.queues.pop_process(ready).unwrap();
 
                 match &mut self.current {
                     Some(current) => {
