@@ -14,7 +14,7 @@ use alloc::rc::Rc;
 use core::cell::RefCell;
 use crate::process::scheduler::MLFQScheduler;
 
-pub type PID = u32;
+pub type PID = i32;
 
 const DEFAULT_STACK_BYTES: usize = 0x00001000; // = 4 KiB
 

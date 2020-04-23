@@ -105,7 +105,7 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
             }
             SysCall::Read => {}
             SysCall::Fork => {
-                ctx.gpr[0] = state.process_manager.fork(ctx);
+                ctx.gpr[0] = state.process_manager.fork(ctx) as u32;
             }
             SysCall::Exit => {
                 let code = ctx.gpr[0];
@@ -116,7 +116,7 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
                 state.process_manager.exec(ctx, address);
             }
             SysCall::Kill => {
-                let pid = ctx.gpr[0];
+                let pid = ctx.gpr[0] as i32;
                 let signal = ctx.gpr[1] as i32;
                 let error_code: i32 = -1;
                 ctx.gpr[0] = state.process_manager.signal(pid, signal).map_or(error_code as u32, |_| 0);
