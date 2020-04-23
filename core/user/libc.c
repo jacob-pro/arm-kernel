@@ -6,6 +6,7 @@
  */
 
 #include "libc.h"
+#include <string.h>
 
 int  atoi( char* x        ) {
   char* p = x; bool s = false; int r = 0;
@@ -146,4 +147,8 @@ void nice( int pid, int x ) {
               : "r0", "r1" );
 
   return;
+}
+
+int writestr(int fd, char* string) {
+    return write(fd, string, strlen(string));
 }

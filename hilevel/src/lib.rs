@@ -102,7 +102,7 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
 
     FromPrimitive::from_u32(id).map(|id| {
         match id {
-            SysCall::Yield => {}
+            SysCall::Yield => {/*The scheduler will deal with this further down*/}
             SysCall::Write => {
                 let _file_descriptor = ctx.gpr[0];
                 let start_ptr = ctx.gpr[1] as *const u8;

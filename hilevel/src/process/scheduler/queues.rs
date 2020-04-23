@@ -158,7 +158,7 @@ impl Default for MultiLevelQueue {
 }
 
 
-pub struct MultiLevelQueueIterator {
+struct MultiLevelQueueIterator {
     start: StrongQueueRef,
     current: Option<StrongQueueRef>,
 }
