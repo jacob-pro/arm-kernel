@@ -25,19 +25,10 @@ use bindings::main_console;
 use core::slice::from_raw_parts;
 use core::fmt::Write;
 use crate::device::PL011::UART0;
-use crate::process::ScheduleSource;
+use crate::process::{ScheduleSource, Context};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct Context {
-    pub cpsr: u32,
-    pub pc: u32,
-    pub gpr: [u32; 13usize],
-    pub sp: u32,
-    pub lr: u32,
-}
 
 #[no_mangle]
 #[cfg(not(test))]
@@ -128,7 +119,7 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
                 let pid = ctx.gpr[0];
                 let signal = ctx.gpr[1] as i32;
                 let error_code: i32 = -1;
-                ctx.gpr[0] = state.process_manager.signal(pid, signal).map_or(error_code as u32, |_| 0); //u32::MAX = -1 signed
+                ctx.gpr[0] = state.process_manager.signal(pid, signal).map_or(error_code as u32, |_| 0);
             }
             SysCall::Nice => {}
         }

@@ -1,7 +1,10 @@
 mod table;
 mod scheduler;
+mod context;
 
-use crate::{Context, SysCall};
+pub use context::Context;
+
+use crate::SysCall;
 use crate::device::PL011::UART0;
 use core::fmt::Write;
 use alloc::string::{ToString, String};
@@ -44,11 +47,10 @@ pub struct ProcessControlBlock {
     context: Context,
 }
 
-const CPSR_USR: u32 = 0x50;
 
 impl ProcessControlBlock {
 
-    fn new1(pid: PID, stack: Vec<u8>, context: Context) -> ProcessControlBlock {
+    fn new(pid: PID, stack: Vec<u8>, context: Context) -> ProcessControlBlock {
         let tos = stack.last().unwrap() as *const _;
         let bos = stack.first().unwrap() as *const _;
         assert!(context.sp <= tos as u32);
@@ -61,24 +63,6 @@ impl ProcessControlBlock {
         }
     }
 
-    fn new(pid: PID, stack: Vec<u8>, pc: u32, sp: u32) -> ProcessControlBlock {
-        let tos = stack.last().unwrap() as *const _;
-        let bos = stack.first().unwrap() as *const _;
-        assert!(sp <= tos as u32);
-        assert!(sp >= bos as u32);
-        ProcessControlBlock{
-            pid,
-            status: ProcessStatus::Ready,
-            stack,
-            context: Context {
-                cpsr: CPSR_USR,
-                pc,
-                gpr: [0; 13],
-                sp,
-                lr: 0
-            }
-        }
-    }
 }
 
 
@@ -89,7 +73,7 @@ impl ProcessManager {
         let pid = self.table.new_pid();
         let stack = uninit_bytes(DEFAULT_STACK_BYTES);
         let tos = stack.last().unwrap() as *const _;         // last() because the stack grows downwards from higher -> lower addresses
-        let pcb = ProcessControlBlock::new(pid, stack, main as u32, tos as u32);
+        let pcb = ProcessControlBlock::new(pid, stack, Context::new(main as u32, tos as u32));
         let process = Rc::new(RefCell::new(pcb));
         self.table.insert(pid, Rc::clone(&process));
         self.scheduler.insert_process(Rc::clone(&process));
@@ -113,11 +97,11 @@ impl ProcessManager {
         let borrowed = current.borrow();
         let new_pid = self.table.new_pid();
         let new_stack = borrowed.stack.clone();
-        let new_sp = adjust_sp(&borrowed.stack, &new_stack, ctx.sp);
+        let remapped_sp = adjust_sp(&borrowed.stack, &new_stack, ctx.sp);
         let mut new_ctx = ctx.clone();
-        new_ctx.sp = new_sp;
+        new_ctx.sp = remapped_sp;
         new_ctx.gpr[0] = 0;
-        let pcb = ProcessControlBlock::new1(new_pid, new_stack, new_ctx);
+        let pcb = ProcessControlBlock::new(new_pid, new_stack, new_ctx);
         let process = Rc::new(RefCell::new(pcb));
         self.table.insert(new_pid, Rc::clone(&process));
         self.scheduler.insert_process(Rc::clone(&process));
@@ -129,13 +113,7 @@ impl ProcessManager {
         let current = self.scheduler.current_process().unwrap();
         let borrowed = current.borrow_mut();
         let tos = borrowed.stack.last().unwrap() as *const _;
-        *ctx = Context {
-            cpsr: CPSR_USR,
-            pc: address,
-            gpr: [0; 13],
-            sp: tos as u32,
-            lr: 0
-        };
+        *ctx = Context::new(address, tos as u32);
     }
 
     // Exits current process

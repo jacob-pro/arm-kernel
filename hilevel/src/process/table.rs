@@ -50,7 +50,7 @@ impl ProcessTable {
 mod tests {
     use crate::process::table::ProcessTable;
     use alloc::vec::Vec;
-    use crate::process::{ProcessControlBlock, PID};
+    use crate::process::{ProcessControlBlock, PID, Context};
     use core::cell::RefCell;
     use alloc::rc::Rc;
 
@@ -58,7 +58,7 @@ mod tests {
     fn new_pid_test() {
 
         let stack = Vec::new();
-        let pcb = ProcessControlBlock::new(0, stack, 0, 0);
+        let pcb = ProcessControlBlock::new(0, stack, Context::new(0, 0));
         let pcb = Rc::new(RefCell::new(pcb));
 
         // An empty table first PID should be 0
