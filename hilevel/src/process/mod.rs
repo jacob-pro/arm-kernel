@@ -25,7 +25,8 @@ pub struct ProcessManager {
 pub enum ProcessStatus {
     Ready,
     Executing,
-    Exited
+    Exited,
+    Terminated,
 }
 
 pub enum ScheduleSource {
@@ -95,9 +96,14 @@ impl ProcessManager {
         pid
     }
 
-    pub fn _signal_process(&mut self, pid: PID) -> Result<(), String> {
+    // Signals sending not implemented, just does SIGKILL regardless of code
+    pub fn signal(&mut self, pid: PID, _signal: i32) -> Result<(), String> {
         let x = self.table.remove(&pid).ok_or("PID not found")?;
-        x.borrow_mut().status = ProcessStatus::Exited;
+        let mut borrow = x.borrow_mut();
+        borrow.status = ProcessStatus::Terminated;
+        self.table.remove(&borrow.pid);
+        self.scheduler.remove_process(&x);
+        write!(UART0(), "[Killed {}]", borrow.pid).ok();
         Ok(())
     }
 
@@ -118,7 +124,7 @@ impl ProcessManager {
         return new_pid
     }
 
-    // Change current process to new PC address
+    // Change current process to new executable address
     pub fn exec(&mut self, ctx: &mut Context, address: u32) {
         let current = self.scheduler.current_process().unwrap();
         let borrowed = current.borrow_mut();
@@ -144,7 +150,6 @@ impl ProcessManager {
 
     pub fn dispatch(&mut self, ctx: &mut Context, src: ScheduleSource) {
         self.scheduler.schedule(src, |prev, mut next| {
-
             let prev_pid_str = match prev {
                 Some(mut x) => {
                     x.context = *ctx;
@@ -155,10 +160,8 @@ impl ProcessManager {
                     "?".to_string()
                 }
             };
-
             *ctx = next.context;
             next.status = ProcessStatus::Executing;
-
             write!(UART0(), "[{}->{}]", prev_pid_str, next.pid).ok();
         });
     }

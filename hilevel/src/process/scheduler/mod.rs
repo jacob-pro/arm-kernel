@@ -101,39 +101,47 @@ impl MLFQScheduler {
                         let below = LinkedQueues::below(&current.queue).unwrap_or(Rc::clone(&current.queue));
                         below.borrow_mut().push_back(Rc::clone(&current.process));
                         dispatch(Some(&mut current.process.borrow_mut()), &mut next_p.borrow_mut());
-                        Some(Current::new(next_p, from_q))
+                        Current::new(next_p, from_q)
                     });
-                    next.map(|n| self.current = n);
+                    next.map(|n| self.current = Some(n));
 
                 }
             },
 
             ScheduleSource::Svc { id } => {
 
-                let (next_p, from_q) = self.queues.pop_process(ready).unwrap();
-
+                // After a service call, we may find that the current process has been removed
                 match &mut self.current {
                     Some(current) => {
                         current.incr_run_count();
-                        // Move current process back onto the MultiLevelQueue
-                        // If Sys Yield then move down queue
-                        // If below max quantum count then move up queue
-                        // Otherwise stay at same queue level
-                        if id == SysCall::Yield {
-                            LinkedQueues::below(&current.queue).unwrap_or(Rc::clone(&current.queue))
-                        } else if current.run_count < Queue::quantum(&(*current.queue).borrow()) {
-                            LinkedQueues::above(&current.queue).unwrap_or(Rc::clone(&current.queue))
-                        } else {
-                            Rc::clone(&current.queue)
-                        }.borrow_mut().push_back(Rc::clone(&current.process));
 
-                        dispatch(Some(&mut current.process.borrow_mut()), &mut next_p.borrow_mut());
+                        // If there is no other process ready, then just skip
+                        let next = self.queues.pop_process(ready).map(|(next_p, from_q)| {
+
+                            // Move current process back onto the MultiLevelQueue
+                            // If Sys Yield then move down queue
+                            // If below max quantum count then move up queue
+                            // Otherwise stay at same queue level
+                            if id == SysCall::Yield {
+                                LinkedQueues::below(&current.queue).unwrap_or(Rc::clone(&current.queue))
+                            } else if current.run_count < Queue::quantum(&(*current.queue).borrow()) {
+                                LinkedQueues::above(&current.queue).unwrap_or(Rc::clone(&current.queue))
+                            } else {
+                                Rc::clone(&current.queue)
+                            }.borrow_mut().push_back(Rc::clone(&current.process));
+
+                            dispatch(Some(&mut current.process.borrow_mut()), &mut next_p.borrow_mut());
+                            Current::new(next_p, from_q)
+                        });
+                        next.map(|n| self.current = Some(n));
+
                     },
                     None => {
+                        let (next_p, from_q) = self.queues.pop_process(ready).expect("No processes scheduled");
                         dispatch(None, &mut (*next_p).borrow_mut());
+                        self.current = Some(Current::new(next_p, from_q));
                     },
                 }
-                self.current = Some(Current::new(next_p, from_q));
             }
         }
     }

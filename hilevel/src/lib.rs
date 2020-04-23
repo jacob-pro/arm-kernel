@@ -15,7 +15,6 @@ mod allocator;
 mod device;
 mod state;
 mod process;
-mod util;
 
 use core::panic::PanicInfo;
 use bindings::PL011_putc;
@@ -125,7 +124,12 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
                 let address = ctx.gpr[0];
                 state.process_manager.exec(ctx, address);
             }
-            SysCall::Kill => {}
+            SysCall::Kill => {
+                let pid = ctx.gpr[0];
+                let signal = ctx.gpr[1] as i32;
+                let error_code: i32 = -1;
+                ctx.gpr[0] = state.process_manager.signal(pid, signal).map_or(error_code as u32, |_| 0); //u32::MAX = -1 signed
+            }
             SysCall::Nice => {}
         }
         state.process_manager.dispatch(ctx, ScheduleSource::Svc {id});
