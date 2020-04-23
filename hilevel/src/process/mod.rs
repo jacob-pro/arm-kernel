@@ -7,7 +7,7 @@ use core::fmt::Write;
 use alloc::string::{ToString, String};
 use alloc::vec::Vec;
 use crate::process::table::ProcessTable;
-use alloc::rc::{Rc, Weak};
+use alloc::rc::Rc;
 use core::cell::RefCell;
 use crate::process::scheduler::MLFQScheduler;
 
@@ -25,7 +25,7 @@ pub struct ProcessManager {
 pub enum ProcessStatus {
     Ready,
     Executing,
-    Terminated
+    Exited
 }
 
 pub enum ScheduleSource {
@@ -35,7 +35,6 @@ pub enum ScheduleSource {
 }
 
 pub type StrongPcbRef = Rc<RefCell<ProcessControlBlock>>;
-pub type WeakPcbRef = Weak<RefCell<ProcessControlBlock>>;
 
 pub struct ProcessControlBlock {
     pid: PID,
@@ -92,19 +91,19 @@ impl ProcessManager {
         let pcb = ProcessControlBlock::new(pid, stack, main as u32, tos as u32);
         let process = Rc::new(RefCell::new(pcb));
         self.table.insert(pid, Rc::clone(&process));
-        self.scheduler.insert_process(Rc::downgrade(&process));
+        self.scheduler.insert_process(Rc::clone(&process));
         pid
     }
 
     pub fn _signal_process(&mut self, pid: PID) -> Result<(), String> {
         let x = self.table.remove(&pid).ok_or("PID not found")?;
-        x.borrow_mut().status = ProcessStatus::Terminated;
+        x.borrow_mut().status = ProcessStatus::Exited;
         Ok(())
     }
 
     // Forks current process, returns the child PID
     pub fn fork(&mut self, ctx: &Context) -> PID {
-        let current = self.scheduler.current_process();
+        let current = self.scheduler.current_process().unwrap();
         let borrowed = current.borrow();
         let new_pid = self.table.new_pid();
         let new_stack = borrowed.stack.clone();
@@ -115,13 +114,13 @@ impl ProcessManager {
         let pcb = ProcessControlBlock::new1(new_pid, new_stack, new_ctx);
         let process = Rc::new(RefCell::new(pcb));
         self.table.insert(new_pid, Rc::clone(&process));
-        self.scheduler.insert_process(Rc::downgrade(&process));
+        self.scheduler.insert_process(Rc::clone(&process));
         return new_pid
     }
 
     // Change current process to new PC address
     pub fn exec(&mut self, ctx: &mut Context, address: u32) {
-        let current = self.scheduler.current_process();
+        let current = self.scheduler.current_process().unwrap();
         let borrowed = current.borrow_mut();
         let tos = borrowed.stack.last().unwrap() as *const _;
         *ctx = Context {
@@ -135,10 +134,11 @@ impl ProcessManager {
 
     // Exits current process
     pub fn exit(&mut self, _code: u32) {
-        let current = self.scheduler.current_process();
+        let current = self.scheduler.current_process().unwrap();
         let mut borrowed = current.borrow_mut();
-        borrowed.status = ProcessStatus::Terminated;
+        borrowed.status = ProcessStatus::Exited;
         self.table.remove(&borrowed.pid);
+        self.scheduler.remove_process(&current).unwrap();
         write!(UART0(), "[{} Exited]", borrowed.pid).ok();
     }
 

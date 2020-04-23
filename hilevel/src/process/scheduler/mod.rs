@@ -1,6 +1,6 @@
 mod queues;
 
-use crate::process::{ProcessControlBlock, WeakPcbRef, StrongPcbRef, ScheduleSource, ProcessStatus};
+use crate::process::{ProcessControlBlock, StrongPcbRef, ScheduleSource, ProcessStatus};
 use alloc::rc::Rc;
 use queues::{MultiLevelQueue, LinkedQueues, StrongQueueRef};
 use crate::process::scheduler::queues::Queue;
@@ -17,7 +17,6 @@ pub struct MLFQScheduler {
 
 // Info about the process which is currently being executed in user mode
 struct Current {
-    // Keep strong reference to current process, if deleted it will deallocate once we start executing something else
     process: StrongPcbRef,
     // The queue that the process was taken from
     queue: StrongQueueRef,
@@ -50,11 +49,30 @@ impl MLFQScheduler {
         }
     }
 
-    // Add new process to top queue, scheduler does not keep ownership
-    pub fn insert_process(&mut self, process: WeakPcbRef) {
-        self.queues.top_queue().borrow_mut().push_back(process)
+    // Add new process to the scheduler
+    pub fn insert_process(&mut self, process: StrongPcbRef) {
+        if self.queues.contains(&process) { panic!("Process already found in scheduler") }
+        self.queues.top_queue().borrow_mut().push_front(process)
     }
 
+    // Remove a process from the scheduler
+    pub fn remove_process(&mut self, process: &StrongPcbRef) -> Option<StrongPcbRef> {
+        match &self.current {
+            Some(c) => {
+                if Rc::ptr_eq(process, &c.process) {
+                    let k = Some(Rc::clone(&c.process));
+                    self.current = None;
+                    return k;
+                }
+            },
+            _ => {}
+        }
+        self.queues.remove_process(process)
+    }
+
+    pub fn current_process(&self) -> Option<StrongPcbRef> {
+        self.current.as_ref().map(|x| Rc::clone(&x.process))
+    }
 
     pub fn schedule<F>(&mut self, src: ScheduleSource, mut dispatch: F)
         where F: FnMut(Option<&mut ProcessControlBlock>, &mut ProcessControlBlock)
@@ -82,7 +100,7 @@ impl MLFQScheduler {
                     let next = self.queues.first_process(ready).map(|(next_p, from_q)| {
                         // Move the current to a lower/same queue
                         let below = LinkedQueues::below(&current.queue).unwrap_or(Rc::clone(&current.queue));
-                        below.borrow_mut().push_back(Rc::downgrade(&current.process));
+                        below.borrow_mut().push_back(Rc::clone(&current.process));
                         dispatch(Some(&mut current.process.borrow_mut()), &mut next_p.borrow_mut());
                         Some(Current::new(next_p, from_q))
                     });
@@ -92,31 +110,33 @@ impl MLFQScheduler {
             },
 
             ScheduleSource::Svc { id } => {
-                let current = self.current.as_mut().unwrap();
-                current.incr_run_count();
 
-                // Move current process back onto the MultiLevelQueue
-                // If Sys Yield then move down queue
-                // If below max quantum count then move up queue
-                // Otherwise stay at same queue level
-                if id == SysCall::Yield {
-                    LinkedQueues::below(&current.queue).unwrap_or(Rc::clone(&current.queue))
-                } else if current.run_count < Queue::quantum(&(*current.queue).borrow()) {
-                    LinkedQueues::above(&current.queue).unwrap_or(Rc::clone(&current.queue))
-                } else {
-                    Rc::clone(&current.queue)
-                }.borrow_mut().push_back(Rc::downgrade(&current.process));
-
-                // Dispatch the next process
                 let (next_p, from_q) = self.queues.first_process(ready).unwrap();
-                dispatch(Some(&mut current.process.borrow_mut()), &mut next_p.borrow_mut());
+
+                match &mut self.current {
+                    Some(current) => {
+                        current.incr_run_count();
+                        // Move current process back onto the MultiLevelQueue
+                        // If Sys Yield then move down queue
+                        // If below max quantum count then move up queue
+                        // Otherwise stay at same queue level
+                        if id == SysCall::Yield {
+                            LinkedQueues::below(&current.queue).unwrap_or(Rc::clone(&current.queue))
+                        } else if current.run_count < Queue::quantum(&(*current.queue).borrow()) {
+                            LinkedQueues::above(&current.queue).unwrap_or(Rc::clone(&current.queue))
+                        } else {
+                            Rc::clone(&current.queue)
+                        }.borrow_mut().push_back(Rc::clone(&current.process));
+
+                        dispatch(Some(&mut current.process.borrow_mut()), &mut next_p.borrow_mut());
+                    },
+                    None => {
+                        dispatch(None, &mut (*next_p).borrow_mut());
+                    },
+                }
                 self.current = Some(Current::new(next_p, from_q));
             }
         }
-    }
-
-    pub fn current_process(&self) -> StrongPcbRef {
-        self.current.as_ref().map(|x| Rc::clone(&x.process)).unwrap()
     }
 
 }

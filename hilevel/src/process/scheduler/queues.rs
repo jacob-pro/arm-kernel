@@ -1,11 +1,11 @@
 use core::ops;
-use crate::util::WeakQueue;
 use core::cell::RefCell;
 use crate::process::{ProcessControlBlock, StrongPcbRef};
 use alloc::rc::{Weak, Rc};
+use alloc::collections::VecDeque;
 
 pub type StrongQueueRef = Rc<RefCell<Queue>>;
-type QueueInternal = WeakQueue<RefCell<ProcessControlBlock>>;
+type QueueInternal = VecDeque<StrongPcbRef>;
 
 // Both above and below can't be strong otherwise there would be a reference cycle
 pub struct Queue {
@@ -61,23 +61,29 @@ impl MultiLevelQueue {
         Rc::clone(&self.top)
     }
 
-    pub fn iter(&self) -> MultiLevelQueueIterator {
+    fn iter(&self) -> MultiLevelQueueIterator {
         MultiLevelQueueIterator {start: Rc::clone(&self.top), current: None }
     }
 
-    // Search queues for process
+    // If a given process is contained in any queue
+    pub fn contains(&self, process: &StrongPcbRef) -> bool {
+        for queue in self.iter() {
+            let borrow = queue.borrow();
+            if borrow.iter().any(|x| Rc::ptr_eq(process, x)) {return true}
+        }
+        false
+    }
+
+    // Search queues for first matching process
     pub fn first_process<F>(&mut self, filter: F) -> Option<(StrongPcbRef, StrongQueueRef)>
         where F: Fn(&ProcessControlBlock)->bool
     {
-        // Iterate from High to Lower queues
         for queue in self.iter() {
             let mut borrowed = queue.borrow_mut();
-            for _ in 0..borrowed.len() {
-                let popped = borrowed.pop_front().unwrap();
-                if filter(&popped.borrow()) {
+            for (i, item) in borrowed.iter().enumerate() {
+                if filter(& (*item).borrow()) {
+                    let popped = borrowed.remove(i).unwrap();
                     return Some((popped, Rc::clone(&queue)))
-                } else {
-                    borrowed.push_back(Rc::downgrade(&popped));
                 }
             }
         }
@@ -90,6 +96,19 @@ impl MultiLevelQueue {
             let x = &mut queue.borrow_mut().internal;
             self.top.borrow_mut().internal.append(x)
         }
+    }
+
+    // Removes a process if it is found in any queue
+    pub fn remove_process(&mut self, process: &StrongPcbRef) -> Option<StrongPcbRef> {
+        for queue in self.iter() {
+            let mut borrow = queue.borrow_mut();
+            for (i, item) in borrow.iter().enumerate() {
+                if Rc::ptr_eq(process, item) {
+                    return borrow.remove(i)
+                }
+            }
+        }
+        None
     }
 
 }
