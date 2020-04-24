@@ -3,15 +3,18 @@ use core::cell::RefCell;
 use crate::process::{ProcessControlBlock, StrongPcbRef};
 use alloc::rc::{Weak, Rc};
 use alloc::collections::VecDeque;
+use alloc::vec::Vec;
 
 pub type StrongQueueRef = Rc<RefCell<Queue>>;
 type QueueInternal = VecDeque<StrongPcbRef>;
+
+const QUEUE_QUANTUM: &[u32] = &[2, 4, 8, 16];
 
 // Both above and below can't be strong otherwise there would be a reference cycle
 pub struct Queue {
     above: Option<Weak<RefCell<Queue>>>,
     internal: QueueInternal,
-    below: Option<Rc<RefCell<Queue>>>,
+    below: Option<StrongQueueRef>,
     quantum: u32,
 }
 
@@ -56,6 +59,35 @@ pub struct MultiLevelQueue {
 }
 
 impl MultiLevelQueue {
+
+    pub fn new(mut quantums: Vec<u32>) -> Self {
+        assert!(quantums.len() > 0);
+        // Create top queue
+        let top = Rc::new(RefCell::new(Queue {
+            above: None,
+            internal: Default::default(),
+            below: None,
+            quantum: quantums.remove(0),
+        }));
+        let mut queues = vec![top];
+        // Add queues below, linking each up above
+        for quantum in quantums.into_iter() {
+            Rc::new(RefCell::new(Queue {
+                above: Some(Rc::downgrade(queues.last().unwrap())),
+                internal: Default::default(),
+                below: None,
+                quantum,
+            }));
+        }
+        // Link the queues to the ones below, by iterating upwards
+        let mut i = Rc::clone(queues.last().unwrap());
+        while i.borrow().above.is_some() {
+            let above = i.borrow().above.as_ref().map(|x| Weak::upgrade(x).unwrap()).unwrap();
+            above.borrow_mut().below = Some(Rc::clone(&i));
+            i = above;
+        }
+        MultiLevelQueue { top: queues.remove(0) }
+    }
 
     fn iter(&self) -> MultiLevelQueueIterator {
         MultiLevelQueueIterator {start: Rc::clone(&self.top), current: None }
@@ -117,43 +149,7 @@ impl MultiLevelQueue {
 
 impl Default for MultiLevelQueue {
     fn default() -> Self {
-
-        // Create 4 queues
-        // Each of them have references to the queue above
-        let top = Rc::new(RefCell::new(Queue {
-            above: None,
-            internal: Default::default(),
-            below: None,
-            quantum: 2
-        }));
-        let three = Rc::new(RefCell::new(Queue {
-            above: Some(Rc::downgrade(&top)),
-            internal: Default::default(),
-            below: None,
-            quantum: 4
-        }));
-        let two = Rc::new(RefCell::new(Queue {
-            above: Some(Rc::downgrade(&three)),
-            internal: Default::default(),
-            below: None,
-            quantum: 8
-        }));
-        let bottom = Rc::new(RefCell::new(Queue {
-            above: Some(Rc::downgrade(&two)),
-            internal: Default::default(),
-            below: None,
-            quantum: 16
-        }));
-
-        // Link the queues to the ones below, by iterating upwards
-        let mut i = bottom;
-        while i.borrow_mut().above.is_some() {
-            let above = i.borrow().above.as_ref().map(|x| Weak::upgrade(x).unwrap()).unwrap();
-            above.borrow_mut().below = Some(Rc::clone(&i));
-            i = above;
-        }
-
-        MultiLevelQueue { top }
+        MultiLevelQueue::new(QUEUE_QUANTUM.to_vec())
     }
 }
 

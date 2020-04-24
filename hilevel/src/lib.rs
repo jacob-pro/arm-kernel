@@ -3,6 +3,7 @@
 #![feature(core_intrinsics)]
 #![feature(map_first_last)]
 
+#[macro_use]
 extern crate alloc;
 
 #[allow(non_upper_case_globals)]
@@ -121,7 +122,7 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
                 let error_code: i32 = -1;
                 ctx.gpr[0] = state.process_manager.signal(pid, signal).map_or(error_code as u32, |_| 0);
             }
-            SysCall::Nice => {}
+            SysCall::Nice => {/* Unimplemented */}
         }
         state.process_manager.dispatch(ctx, ScheduleSource::Svc {id});
     });
