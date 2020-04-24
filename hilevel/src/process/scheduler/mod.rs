@@ -2,7 +2,7 @@ mod queues;
 
 use crate::process::{ProcessControlBlock, StrongPcbRef, ScheduleSource, ProcessStatus};
 use alloc::rc::Rc;
-use queues::{MultiLevelQueue, LinkedQueues, StrongQueueRef};
+use queues::{MultiLevelQueue, LinkedQueues, StrongQueueLevelRef};
 use crate::process::scheduler::queues::QueueLevel;
 use crate::SysCall;
 
@@ -19,14 +19,14 @@ pub struct MLFQScheduler {
 struct Current {
     process: StrongPcbRef,
     // The queue that the process was taken from
-    queue: StrongQueueRef,
+    queue: StrongQueueLevelRef,
     // The number of time quantum the current process has already been running for
     run_count: u32
 }
 
 impl Current {
 
-    fn new(process: StrongPcbRef, queue: StrongQueueRef) -> Current {
+    fn new(process: StrongPcbRef, queue: StrongQueueLevelRef) -> Current {
         Current {
             process,
             queue,

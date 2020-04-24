@@ -5,57 +5,25 @@ use alloc::rc::{Weak, Rc};
 use alloc::collections::VecDeque;
 use alloc::vec::Vec;
 
-pub type StrongQueueRef = Rc<RefCell<QueueLevel>>;
-type QueueInternal = VecDeque<StrongPcbRef>;
+pub type StrongQueueLevelRef = Rc<RefCell<QueueLevel>>;
 
 const QUEUE_QUANTUM: &[u32] = &[2, 4, 8, 16];
+
+pub struct MultiLevelQueue {
+    top: StrongQueueLevelRef
+}
 
 // Both above and below can't be strong otherwise there would be a reference cycle
 pub struct QueueLevel {
     above: Option<Weak<RefCell<QueueLevel>>>,
-    internal: QueueInternal,
-    below: Option<StrongQueueRef>,
+    internal: VecDeque<StrongPcbRef>,
+    below: Option<StrongQueueLevelRef>,
     quantum: u32,
 }
 
 pub trait LinkedQueues {
-    fn below(&self) -> Option<StrongQueueRef>;
-    fn above(&self) -> Option<StrongQueueRef>;
-}
-
-impl LinkedQueues for StrongQueueRef {
-
-    fn below(&self) -> Option<StrongQueueRef> {
-        self.borrow().below.as_ref().map(|x| Rc::clone(x))
-    }
-
-    fn above(&self) -> Option<StrongQueueRef> {
-        self.borrow().above.as_ref().map(|x| Weak::upgrade(x).unwrap())
-    }
-
-}
-
-impl ops::Deref for QueueLevel {
-    type Target = QueueInternal;
-    fn deref(&self) -> &Self::Target {
-        &self.internal
-    }
-}
-
-impl ops::DerefMut for QueueLevel {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.internal
-    }
-}
-
-impl QueueLevel {
-    pub fn quantum(&self) -> u32 {
-        self.quantum
-    }
-}
-
-pub struct MultiLevelQueue {
-    top: StrongQueueRef
+    fn below(&self) -> Option<StrongQueueLevelRef>;
+    fn above(&self) -> Option<StrongQueueLevelRef>;
 }
 
 impl MultiLevelQueue {
@@ -89,7 +57,7 @@ impl MultiLevelQueue {
         MultiLevelQueue { top: queues.remove(0) }
     }
 
-    pub fn top_queue(&self) -> StrongQueueRef {
+    pub fn top_queue(&self) -> StrongQueueLevelRef {
         Rc::clone(&self.top)
     }
 
@@ -107,7 +75,7 @@ impl MultiLevelQueue {
     }
 
     // Search queues for first matching process
-    pub fn pop_process<F>(&mut self, filter: F) -> Option<(StrongPcbRef, StrongQueueRef)>
+    pub fn pop_process<F>(&mut self, filter: F) -> Option<(StrongPcbRef, StrongQueueLevelRef)>
         where F: Fn(&ProcessControlBlock)->bool
     {
         for queue in self.iter() {
@@ -151,14 +119,44 @@ impl Default for MultiLevelQueue {
     }
 }
 
+impl LinkedQueues for StrongQueueLevelRef {
+
+    fn below(&self) -> Option<StrongQueueLevelRef> {
+        self.borrow().below.as_ref().map(|x| Rc::clone(x))
+    }
+
+    fn above(&self) -> Option<StrongQueueLevelRef> {
+        self.borrow().above.as_ref().map(|x| Weak::upgrade(x).unwrap())
+    }
+}
+
+impl ops::Deref for QueueLevel {
+    type Target = VecDeque<StrongPcbRef>;
+    fn deref(&self) -> &Self::Target {
+        &self.internal
+    }
+}
+
+impl ops::DerefMut for QueueLevel {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.internal
+    }
+}
+
+impl QueueLevel {
+    pub fn quantum(&self) -> u32 {
+        self.quantum
+    }
+}
+
 struct MultiLevelQueueIterator {
-    start: StrongQueueRef,
-    current: Option<StrongQueueRef>,
+    start: StrongQueueLevelRef,
+    current: Option<StrongQueueLevelRef>,
 }
 
 // Iterates through queues downwards
 impl Iterator for MultiLevelQueueIterator {
-    type Item = StrongQueueRef;
+    type Item = StrongQueueLevelRef;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.current = match &self.current {
