@@ -47,14 +47,13 @@ pub struct ProcessControlBlock {
     context: Context,
 }
 
-
 impl ProcessControlBlock {
 
     fn new(pid: PID, stack: Vec<u8>, context: Context) -> ProcessControlBlock {
-        let tos = stack.last().unwrap() as *const _;
-        let bos = stack.first().unwrap() as *const _;
-        assert!(context.sp <= tos as u32);
-        assert!(context.sp >= bos as u32);
+        // let tos = stack.last().unwrap() as *const _;
+        // let bos = stack.first().unwrap() as *const _;
+        // assert!(context.sp <= tos as u32);
+        // assert!(context.sp >= bos as u32);
         ProcessControlBlock{
             pid,
             status: ProcessStatus::Ready,
@@ -62,9 +61,7 @@ impl ProcessControlBlock {
             context,
         }
     }
-
 }
-
 
 impl ProcessManager {
 
@@ -143,7 +140,6 @@ impl ProcessManager {
             write!(UART0(), "[{}->{}]", prev_pid_str, next.pid).ok();
         });
     }
-
 }
 
 // A heap allocated byte array of length size. Values are uninitialised
@@ -152,7 +148,6 @@ fn uninit_bytes(size: usize) -> Vec<u8> {
     unsafe { stack.set_len(size) };
     stack
 }
-
 
 fn adjust_sp(old_stack: &Vec<u8>, new_stack: &Vec<u8>, old_sp: u32) -> u32 {
     let old_tos = old_stack.last().unwrap() as *const _;

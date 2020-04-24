@@ -3,7 +3,7 @@ mod queues;
 use crate::process::{ProcessControlBlock, StrongPcbRef, ScheduleSource, ProcessStatus};
 use alloc::rc::Rc;
 use queues::{MultiLevelQueue, LinkedQueues, StrongQueueRef};
-use crate::process::scheduler::queues::Queue;
+use crate::process::scheduler::queues::QueueLevel;
 use crate::SysCall;
 
 const BOOST_QUANTUM: u32 = 50;
@@ -51,7 +51,8 @@ impl MLFQScheduler {
 
     // Add new process to the scheduler
     pub fn insert_process(&mut self, process: StrongPcbRef) {
-        self.queues.insert_process(process)
+        if self.queues.contains(&process) { panic!("Process already in queue") }
+        self.queues.top_queue().borrow_mut().push_front(process)
     }
 
     // Remove a process from the scheduler
@@ -93,7 +94,7 @@ impl MLFQScheduler {
                 current.incr_run_count();
 
                 // If it has been running longer than its count, try to move to next top process
-                if current.run_count >= Queue::quantum(&(*current.queue).borrow()) {
+                if current.run_count >= QueueLevel::quantum(&(*current.queue).borrow()) {
 
                     // If there is no other process ready, then just skip
                     let next = self.queues.pop_process(ready).map(|(next_p, from_q)| {
@@ -124,7 +125,7 @@ impl MLFQScheduler {
                             // Otherwise stay at same queue level
                             if id == SysCall::Yield {
                                 LinkedQueues::below(&current.queue).unwrap_or(Rc::clone(&current.queue))
-                            } else if current.run_count < Queue::quantum(&(*current.queue).borrow()) {
+                            } else if current.run_count < QueueLevel::quantum(&(*current.queue).borrow()) {
                                 LinkedQueues::above(&current.queue).unwrap_or(Rc::clone(&current.queue))
                             } else {
                                 Rc::clone(&current.queue)

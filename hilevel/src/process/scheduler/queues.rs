@@ -5,14 +5,14 @@ use alloc::rc::{Weak, Rc};
 use alloc::collections::VecDeque;
 use alloc::vec::Vec;
 
-pub type StrongQueueRef = Rc<RefCell<Queue>>;
+pub type StrongQueueRef = Rc<RefCell<QueueLevel>>;
 type QueueInternal = VecDeque<StrongPcbRef>;
 
 const QUEUE_QUANTUM: &[u32] = &[2, 4, 8, 16];
 
 // Both above and below can't be strong otherwise there would be a reference cycle
-pub struct Queue {
-    above: Option<Weak<RefCell<Queue>>>,
+pub struct QueueLevel {
+    above: Option<Weak<RefCell<QueueLevel>>>,
     internal: QueueInternal,
     below: Option<StrongQueueRef>,
     quantum: u32,
@@ -35,20 +35,20 @@ impl LinkedQueues for StrongQueueRef {
 
 }
 
-impl ops::Deref for Queue {
+impl ops::Deref for QueueLevel {
     type Target = QueueInternal;
     fn deref(&self) -> &Self::Target {
         &self.internal
     }
 }
 
-impl ops::DerefMut for Queue {
+impl ops::DerefMut for QueueLevel {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.internal
     }
 }
 
-impl Queue {
+impl QueueLevel {
     pub fn quantum(&self) -> u32 {
         self.quantum
     }
@@ -63,7 +63,7 @@ impl MultiLevelQueue {
     pub fn new(mut quantums: Vec<u32>) -> Self {
         assert!(quantums.len() > 0);
         // Create top queue
-        let top = Rc::new(RefCell::new(Queue {
+        let top = Rc::new(RefCell::new(QueueLevel {
             above: None,
             internal: Default::default(),
             below: None,
@@ -72,7 +72,7 @@ impl MultiLevelQueue {
         let mut queues = vec![top];
         // Add queues below, linking each up above
         for quantum in quantums.into_iter() {
-            Rc::new(RefCell::new(Queue {
+            Rc::new(RefCell::new(QueueLevel {
                 above: Some(Rc::downgrade(queues.last().unwrap())),
                 internal: Default::default(),
                 below: None,
@@ -87,6 +87,10 @@ impl MultiLevelQueue {
             i = above;
         }
         MultiLevelQueue { top: queues.remove(0) }
+    }
+
+    pub fn top_queue(&self) -> StrongQueueRef {
+        Rc::clone(&self.top)
     }
 
     fn iter(&self) -> MultiLevelQueueIterator {
@@ -126,12 +130,6 @@ impl MultiLevelQueue {
         }
     }
 
-    // Inserts a new process to the front of the first queue
-    pub fn insert_process(&mut self, process: StrongPcbRef) {
-        if self.contains(&process) { panic!("Process already in queue") }
-        self.top.borrow_mut().push_front(process)
-    }
-
     // Removes a process if it is found in any queue
     pub fn remove_process(&mut self, process: &StrongPcbRef) -> Option<StrongPcbRef> {
         for queue in self.iter() {
@@ -153,7 +151,6 @@ impl Default for MultiLevelQueue {
     }
 }
 
-
 struct MultiLevelQueueIterator {
     start: StrongQueueRef,
     current: Option<StrongQueueRef>,
@@ -174,4 +171,35 @@ impl Iterator for MultiLevelQueueIterator {
         };
         self.current.clone()
     }
+}
+
+#[cfg(test)]
+mod tests {
+
+
+    #[test]
+    fn new_test() {
+
+    }
+
+    #[test]
+    fn iter_test() {
+
+    }
+
+    #[test]
+    fn contains_test() {
+
+    }
+
+    #[test]
+    fn boost_test() {
+
+    }
+
+    #[test]
+    fn remove_test() {
+
+    }
+
 }
