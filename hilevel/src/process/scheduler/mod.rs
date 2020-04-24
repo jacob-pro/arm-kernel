@@ -51,7 +51,7 @@ impl MLFQScheduler {
 
     // Add new process to the scheduler
     pub fn insert_process(&mut self, process: StrongPcbRef) {
-        if self.queues.contains(&process) { panic!("Process already in queue") }
+        if self.queues.contains(&process) { panic!("Process already in scheduler") }
         self.queues.top_queue().borrow_mut().push_front(process)
     }
 
@@ -77,9 +77,7 @@ impl MLFQScheduler {
     pub fn schedule<F>(&mut self, src: ScheduleSource, mut dispatch: F)
         where F: FnMut(Option<&mut ProcessControlBlock>, &mut ProcessControlBlock)
     {
-
         match src {
-
             // A reset means no process is currently running
             ScheduleSource::Reset => {
                 let (next_p, from_q) = self.queues.pop_process(ready).expect("No process found");
@@ -110,7 +108,6 @@ impl MLFQScheduler {
             },
 
             ScheduleSource::Svc { id } => {
-
                 // After a service call, we may find that the current process has been removed
                 match &mut self.current {
                     Some(current) => {
@@ -146,7 +143,6 @@ impl MLFQScheduler {
             }
         }
     }
-
 }
 
 fn ready(process: &ProcessControlBlock) -> bool {

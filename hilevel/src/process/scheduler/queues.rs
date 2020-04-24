@@ -72,17 +72,17 @@ impl MultiLevelQueue {
         let mut queues = vec![top];
         // Add queues below, linking each up above
         for quantum in quantums.into_iter() {
-            Rc::new(RefCell::new(QueueLevel {
+            queues.push(Rc::new(RefCell::new(QueueLevel {
                 above: Some(Rc::downgrade(queues.last().unwrap())),
                 internal: Default::default(),
                 below: None,
                 quantum,
-            }));
+            })));
         }
         // Link the queues to the ones below, by iterating upwards
         let mut i = Rc::clone(queues.last().unwrap());
         while i.borrow().above.is_some() {
-            let above = i.borrow().above.as_ref().map(|x| Weak::upgrade(x).unwrap()).unwrap();
+            let above = LinkedQueues::above(&i).unwrap();
             above.borrow_mut().below = Some(Rc::clone(&i));
             i = above;
         }
@@ -166,7 +166,7 @@ impl Iterator for MultiLevelQueueIterator {
                 Some(Rc::clone(&self.start))
             },
             Some(x) => {
-                Rc::clone(x).borrow().below.clone()
+                LinkedQueues::below(x)
             },
         };
         self.current.clone()
@@ -175,31 +175,81 @@ impl Iterator for MultiLevelQueueIterator {
 
 #[cfg(test)]
 mod tests {
-
+    use crate::process::scheduler::queues::{MultiLevelQueue, LinkedQueues};
+    use alloc::rc::Rc;
+    use alloc::vec::Vec;
+    use core::cell::RefCell;
+    use crate::process::{ProcessControlBlock, Context, StrongPcbRef};
 
     #[test]
     fn new_test() {
+        let mlq = MultiLevelQueue::new(vec![1, 2, 3]);
 
+        let top = mlq.top_queue();
+        let middle = LinkedQueues::below(&top).unwrap();
+        let bottom = LinkedQueues::below(&middle).unwrap();
+        assert!(LinkedQueues::below(&bottom).is_none());
+
+        assert_eq!(top.borrow().quantum, 1);
+        assert_eq!(middle.borrow().quantum, 2);
+        assert_eq!(bottom.borrow().quantum, 3);
+
+        assert!(LinkedQueues::above(&top).is_none());
+        assert!(Rc::ptr_eq(&LinkedQueues::above(&bottom).unwrap(), &middle));
+        assert!(Rc::ptr_eq(&LinkedQueues::above(&middle).unwrap(), &top));
     }
 
     #[test]
     fn iter_test() {
-
+        let qs = vec![1, 2, 3, 5, 9];
+        let mlq = MultiLevelQueue::new(qs.clone());
+        let iterated: Vec<u32> = mlq.iter().map(|q| {
+            q.borrow().quantum
+        }).collect();
+        assert_eq!(qs, iterated);
     }
 
     #[test]
-    fn contains_test() {
-
+    fn contains_remove_test() {
+        let item = Rc::new(RefCell::new(ProcessControlBlock::new(0, Vec::new(), Context::new(0, 0))));
+        let mut mlq = MultiLevelQueue::new(vec![1, 2, 3]);
+        assert_eq!(mlq.contains(&item), false);
+        mlq.top_queue().borrow_mut().push_front(Rc::clone(&item));
+        assert_eq!(mlq.contains(&item), true);
+        mlq.remove_process(&item);
+        assert_eq!(mlq.contains(&item), false);
+        let middle = LinkedQueues::below(&mlq.top_queue()).unwrap();
+        middle.borrow_mut().push_back(Rc::clone(&item));
+        assert_eq!(mlq.contains(&item), true);
     }
 
     #[test]
     fn boost_test() {
-
+        let item = Rc::new(RefCell::new(ProcessControlBlock::new(0, Vec::new(), Context::new(0, 0))));
+        let mut mlq = MultiLevelQueue::new(vec![1, 2, 3]);
+        let mut last_queue = mlq.iter().last().unwrap();
+        last_queue.borrow_mut().push_back(Rc::clone(&item));
+        mlq.boost();
+        let (popped, queue) = mlq.pop_process(|x| true).unwrap();
+        assert!(Rc::ptr_eq(&item, &popped));
+        assert!(Rc::ptr_eq(&queue, &mlq.top_queue()));
     }
 
     #[test]
-    fn remove_test() {
-
+    fn pop_test() {
+        let item1 = Rc::new(RefCell::new(ProcessControlBlock::new(0, Vec::new(), Context::new(0, 0))));
+        let item2 = Rc::new(RefCell::new(ProcessControlBlock::new(0, Vec::new(), Context::new(0, 0))));
+        let item3 = Rc::new(RefCell::new(ProcessControlBlock::new(0, Vec::new(), Context::new(0, 0))));
+        let mut mlq = MultiLevelQueue::new(vec![1, 2, 3]);
+        let mut last_queue = mlq.iter().last().unwrap();
+        mlq.top_queue().borrow_mut().push_back(Rc::clone(&item1));
+        mlq.top_queue().borrow_mut().push_back(Rc::clone(&item2));
+        last_queue.borrow_mut().push_back(Rc::clone(&item3));
+        fn filter(pcb: &ProcessControlBlock) -> bool { true };
+        assert!(Rc::ptr_eq(&item1, &mlq.pop_process(filter).unwrap().0));
+        assert!(Rc::ptr_eq(&item2, &mlq.pop_process(filter).unwrap().0));
+        assert!(Rc::ptr_eq(&item3, &mlq.pop_process(filter).unwrap().0));
+        assert!(mlq.pop_process(filter).is_none());
     }
 
 }
