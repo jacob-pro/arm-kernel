@@ -5,7 +5,7 @@ mod context;
 pub use context::Context;
 
 use crate::SysCall;
-use crate::device::PL011::UART0;
+use crate::io::PL011::UART0;
 use core::fmt::Write;
 use alloc::string::{ToString, String};
 use alloc::vec::Vec;
@@ -13,6 +13,9 @@ use crate::process::table::ProcessTable;
 use alloc::rc::Rc;
 use core::cell::RefCell;
 use crate::process::scheduler::MLFQScheduler;
+use hashbrown::HashMap;
+use alloc::boxed::Box;
+use crate::io::descriptor::{FileDescriptor};
 
 pub type PID = i32;
 
@@ -45,9 +48,18 @@ pub struct ProcessControlBlock {
     status: ProcessStatus,
     stack: Vec<u8>,
     context: Context,
+    file_descriptors: HashMap<i32, Rc<dyn FileDescriptor>>,
 }
 
 impl ProcessControlBlock {
+
+    pub fn get_descriptor(&self, fid: i32) -> Option<Rc<dyn FileDescriptor>> {
+        self.file_descriptors.get(&fid).map(|x| Rc::clone(x))
+    }
+
+    pub fn close_descriptor(&mut self, fid: i32) -> Result<(), String> {
+        self.file_descriptors.remove(&fid).map(|x| ()).ok_or("fid not found".to_string())
+    }
 
     fn new(pid: PID, stack: Vec<u8>, context: Context) -> ProcessControlBlock {
         // let tos = stack.last().unwrap() as *const _;
@@ -59,6 +71,7 @@ impl ProcessControlBlock {
             status: ProcessStatus::Ready,
             stack,
             context,
+            file_descriptors: HashMap::default()
         }
     }
 }
@@ -121,6 +134,10 @@ impl ProcessManager {
         self.table.remove(&borrowed.pid);
         self.scheduler.remove_process(&current).unwrap();
         write!(UART0(), "[{} Exited]", borrowed.pid).ok();
+    }
+
+    pub fn current_process(&mut self) -> Option<StrongPcbRef> {
+        self.scheduler.current_process()
     }
 
     pub fn dispatch(&mut self, ctx: &mut Context, src: ScheduleSource) {

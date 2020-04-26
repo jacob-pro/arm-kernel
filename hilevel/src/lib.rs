@@ -13,7 +13,7 @@ extern crate alloc;
 mod bindings;
 
 mod allocator;
-mod device;
+mod io;
 mod state;
 mod process;
 
@@ -23,9 +23,9 @@ use bindings::TIMER0;
 use bindings::GICC0;
 use bindings::GICD0;
 use bindings::main_console;
-use core::slice::from_raw_parts;
+use core::slice::{from_raw_parts, from_raw_parts_mut};
 use core::fmt::Write;
-use crate::device::PL011::UART0;
+use crate::io::PL011::UART0;
 use crate::process::{ScheduleSource, Context};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
@@ -83,7 +83,11 @@ pub enum SysCall {
     Exec = 5,
     Kill = 6,
     Nice = 7,
+    Close = 8,
+    Pipe = 9,
 }
+
+const SYSCALL_ERROR_CODE: i32 = -1;
 
 #[no_mangle]
 #[cfg(not(test))]
@@ -95,7 +99,7 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
         match id {
             SysCall::Yield => {/*The scheduler will deal with this further down*/}
             SysCall::Write => {
-                let _file_descriptor = ctx.gpr[0];
+                let _file_descriptor = ctx.gpr[0] as i32;
                 let start_ptr = ctx.gpr[1] as *const u8;
                 let length = ctx.gpr[2] as usize;
                 let slice = unsafe { from_raw_parts(start_ptr, length) };
@@ -104,7 +108,22 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
                 });
                 ctx.gpr[0] = slice.len() as u32;
             }
-            SysCall::Read => {}
+            SysCall::Read => {
+                let file_descriptor = ctx.gpr[0] as i32;
+                let start_ptr = ctx.gpr[1] as *mut u8;
+                let length = ctx.gpr[2] as usize;
+                let slice = unsafe { from_raw_parts_mut(start_ptr, length) };
+                let current = state.process_manager.current_process().unwrap();
+                let file = current.borrow().get_descriptor(file_descriptor);
+                match file {
+                    None => { ctx.gpr[0] = SYSCALL_ERROR_CODE as u32},
+                    Some(file) => {
+                        ctx.gpr[0] = file.read(slice).map_or(SYSCALL_ERROR_CODE as u32, |written| written as u32);
+                    },
+                }
+
+
+            }
             SysCall::Fork => {
                 ctx.gpr[0] = state.process_manager.fork(ctx) as u32;
             }
@@ -119,10 +138,18 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
             SysCall::Kill => {
                 let pid = ctx.gpr[0] as i32;
                 let signal = ctx.gpr[1] as i32;
-                let error_code: i32 = -1;
-                ctx.gpr[0] = state.process_manager.signal(pid, signal).map_or(error_code as u32, |_| 0);
+                ctx.gpr[0] = state.process_manager.signal(pid, signal).map_or(SYSCALL_ERROR_CODE as u32, |_| 0);
             }
             SysCall::Nice => {/* Unimplemented */}
+            SysCall::Close => {
+                let file_descriptor = ctx.gpr[0] as i32;
+                let current = state.process_manager.current_process().unwrap();
+                ctx.gpr[0] = current.borrow_mut().close_descriptor(file_descriptor).map_or(SYSCALL_ERROR_CODE as u32, |_| 0);
+            }
+            SysCall::Pipe => {
+                let array_ptr = ctx.gpr[0] as *mut u8;
+                let slice = unsafe { from_raw_parts_mut(array_ptr, 2) };
+            }
         }
         state.process_manager.dispatch(ctx, ScheduleSource::Svc {id});
     });

@@ -56,7 +56,6 @@ mod tests {
 
     #[test]
     fn new_pid_test() {
-
         let stack = Vec::new();
         let pcb = ProcessControlBlock::new(0, stack, Context::new(0, 0));
         let pcb = Rc::new(RefCell::new(pcb));
