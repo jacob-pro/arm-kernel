@@ -5,18 +5,16 @@ mod context;
 pub use context::Context;
 
 use crate::SysCall;
-use crate::io::PL011::UART0;
+use crate::io::PL011::{UART0, UART1};
 use core::fmt::Write;
 use alloc::string::{ToString, String};
 use alloc::vec::Vec;
-use crate::process::table::ProcessTable;
+use crate::process::table::IdTable;
 use alloc::rc::Rc;
 use core::cell::RefCell;
 use crate::process::scheduler::MLFQScheduler;
-use hashbrown::HashMap;
 use alloc::boxed::Box;
-use crate::io::descriptor::{FileDescriptor};
-use crate::io::FileError;
+use crate::io::{FileError, FileDescriptor, STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, UART1_FILENO};
 
 pub type PID = i32;
 
@@ -24,7 +22,7 @@ const DEFAULT_STACK_BYTES: usize = 0x00001000; // = 4 KiB
 
 #[derive(Default)]
 pub struct ProcessManager {
-    table: ProcessTable,
+    table: IdTable<PID, StrongPcbRef>,
     scheduler: MLFQScheduler,
 }
 
@@ -49,10 +47,19 @@ pub struct ProcessControlBlock {
     status: ProcessStatus,
     stack: Vec<u8>,
     context: Context,
-    file_descriptors: HashMap<i32, Rc<dyn FileDescriptor>>,
+    file_descriptors: IdTable<i32, Rc<dyn FileDescriptor>>,
 }
 
 impl ProcessControlBlock {
+
+    fn default_files() -> IdTable<i32, Rc<dyn FileDescriptor>> {
+        let mut table: IdTable<i32, Rc<dyn FileDescriptor>> = IdTable::default();
+        table.insert(STDIN_FILENO, Rc::new(UART0()));
+        table.insert(STDOUT_FILENO, Rc::new(UART0()));
+        table.insert(STDERR_FILENO, Rc::new(UART0()));
+        table.insert(UART1_FILENO, Rc::new(UART1()));
+        table
+    }
 
     fn new(pid: PID, stack: Vec<u8>, context: Context) -> ProcessControlBlock {
         // let tos = stack.last().unwrap() as *const _;
@@ -64,7 +71,7 @@ impl ProcessControlBlock {
             status: ProcessStatus::Ready,
             stack,
             context,
-            file_descriptors: HashMap::default()
+            file_descriptors: ProcessControlBlock::default_files(),
         }
     }
 
@@ -96,7 +103,7 @@ impl ProcessManager {
 
     // Create a new process
     pub fn create_process(&mut self, main: unsafe extern fn()) -> PID {
-        let pid = self.table.new_pid();
+        let pid = self.table.new_pid().unwrap();
         let stack = uninit_bytes(DEFAULT_STACK_BYTES);
         let tos = stack.last().unwrap() as *const _;         // last() because the stack grows downwards from higher -> lower addresses
         let pcb = ProcessControlBlock::new(pid, stack, Context::new(main as u32, tos as u32));
@@ -121,7 +128,7 @@ impl ProcessManager {
     pub fn fork(&mut self, ctx: &Context) -> PID {
         let current = self.scheduler.current_process().unwrap();
         let borrowed = current.borrow();
-        let new_pid = self.table.new_pid();
+        let new_pid = self.table.new_pid().unwrap();
         let new_stack = borrowed.stack.clone();
         let remapped_sp = adjust_sp(&borrowed.stack, &new_stack, ctx.sp);
         let mut new_ctx = ctx.clone();

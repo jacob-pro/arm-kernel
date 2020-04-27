@@ -2,6 +2,7 @@
 #![feature(alloc_error_handler)]
 #![feature(core_intrinsics)]
 #![feature(map_first_last)]
+#![feature(step_trait)]
 
 #[macro_use]
 extern crate alloc;
