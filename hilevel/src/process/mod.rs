@@ -1,4 +1,3 @@
-mod table;
 mod scheduler;
 mod context;
 
@@ -9,12 +8,11 @@ use crate::io::PL011::{UART0, UART1};
 use core::fmt::Write;
 use alloc::string::{ToString, String};
 use alloc::vec::Vec;
-use crate::process::table::IdTable;
 use alloc::rc::Rc;
 use core::cell::RefCell;
 use crate::process::scheduler::MLFQScheduler;
-use alloc::boxed::Box;
 use crate::io::{FileError, FileDescriptor, STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, UART1_FILENO};
+use crate::util::IdTable;
 
 pub type PID = i32;
 
@@ -54,10 +52,13 @@ impl ProcessControlBlock {
 
     fn default_files() -> IdTable<i32, Rc<dyn FileDescriptor>> {
         let mut table: IdTable<i32, Rc<dyn FileDescriptor>> = IdTable::default();
-        table.insert(STDIN_FILENO, Rc::new(UART0()));
-        table.insert(STDOUT_FILENO, Rc::new(UART0()));
-        table.insert(STDERR_FILENO, Rc::new(UART0()));
-        table.insert(UART1_FILENO, Rc::new(UART1()));
+        #[cfg(not(test))]
+        {
+            table.insert(STDIN_FILENO, Rc::new(UART0()));
+            table.insert(STDOUT_FILENO, Rc::new(UART0()));
+            table.insert(STDERR_FILENO, Rc::new(UART0()));
+            table.insert(UART1_FILENO, Rc::new(UART1()));
+        }
         table
     }
 

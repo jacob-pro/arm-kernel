@@ -17,6 +17,7 @@ mod allocator;
 mod io;
 mod state;
 mod process;
+mod util;
 
 use core::panic::PanicInfo;
 use bindings::PL011_putc;

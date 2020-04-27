@@ -1,13 +1,11 @@
 use alloc::collections::BTreeMap;
-use crate::process::{PID, ProcessControlBlock};
 use alloc::borrow::ToOwned;
-use alloc::rc::Rc;
-use core::cell::RefCell;
 use core::ops;
 use num::{Integer, Bounded};
 use num_traits::FromPrimitive;
 use core::iter::Step;
 
+// A table of Integers keys to V, which can automatically generate new keys
 // BTreeMap will be fast for ordered integer keys
 pub struct IdTable<K, V>(BTreeMap<K, V>);
 
@@ -57,32 +55,29 @@ impl <K, V> IdTable<K, V>
 
 #[cfg(test)]
 mod tests {
-    use crate::process::table::IdTable;
     use alloc::vec::Vec;
-    use crate::process::{ProcessControlBlock, PID, Context, StrongPcbRef};
-    use core::cell::RefCell;
-    use alloc::rc::Rc;
+    use alloc::string::String;
+    use alloc::borrow::ToOwned;
+    use crate::util::IdTable;
 
     #[test]
     fn new_pid_test() {
-        let stack = Vec::new();
-        let pcb = ProcessControlBlock::new(0, stack, Context::new(0, 0));
-        let pcb = Rc::new(RefCell::new(pcb));
+        let object = "Hello".to_owned();
 
         // An empty table first id should be 0
-        let mut table: IdTable<PID, StrongPcbRef> = IdTable::default();
+        let mut table: IdTable<i32, String> = IdTable::default();
         assert_eq!(table.new_pid().unwrap(), 0);
 
         // A table with lowest id 0, next should be 1
-        table.insert(0, pcb.clone());
+        table.insert(0, object.clone());
         assert_eq!(table.new_pid().unwrap(), 1);
 
         // A table with lowest id 5, next should be 6
-        table.insert(5, pcb.clone());
+        table.insert(5, object.clone());
         assert_eq!(table.new_pid().unwrap(), 6);
 
         // A table that has been filled up, should loop back around and find first gap after 0
-        table.insert(PID::MAX, pcb.clone());
+        table.insert(i32::MAX, object.clone());
         assert_eq!(table.new_pid().unwrap(), 1);
     }
 }

@@ -6,8 +6,6 @@ use crate::bindings::{PL011_putc, PL011_getc};
 use core::fmt::{Write, Error};
 use core::result::Result;
 use crate::io::descriptor::FileDescriptor;
-use alloc::vec::Vec;
-use alloc::string::String;
 use crate::io::FileError;
 
 #[derive(Clone)]
