@@ -99,7 +99,7 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
         match id {
             SysCall::Yield => {/*The scheduler will deal with this further down*/}
             SysCall::Write => {
-                let _file_descriptor = ctx.gpr[0] as i32;
+                let _fid = ctx.gpr[0] as i32;
                 let start_ptr = ctx.gpr[1] as *const u8;
                 let length = ctx.gpr[2] as usize;
                 let slice = unsafe { from_raw_parts(start_ptr, length) };
@@ -109,20 +109,12 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
                 ctx.gpr[0] = slice.len() as u32;
             }
             SysCall::Read => {
-                let file_descriptor = ctx.gpr[0] as i32;
+                let fid = ctx.gpr[0] as i32;
                 let start_ptr = ctx.gpr[1] as *mut u8;
                 let length = ctx.gpr[2] as usize;
                 let slice = unsafe { from_raw_parts_mut(start_ptr, length) };
                 let current = state.process_manager.current_process().unwrap();
-                let file = current.borrow().get_descriptor(file_descriptor);
-                match file {
-                    None => { ctx.gpr[0] = SYSCALL_ERROR_CODE as u32},
-                    Some(file) => {
-                        ctx.gpr[0] = file.read(slice).map_or(SYSCALL_ERROR_CODE as u32, |written| written as u32);
-                    },
-                }
-
-
+                ctx.gpr[0] = current.borrow_mut().read(fid, slice).map_or(SYSCALL_ERROR_CODE as u32, |written| written as u32);
             }
             SysCall::Fork => {
                 ctx.gpr[0] = state.process_manager.fork(ctx) as u32;
@@ -142,9 +134,9 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
             }
             SysCall::Nice => {/* Unimplemented */}
             SysCall::Close => {
-                let file_descriptor = ctx.gpr[0] as i32;
+                let fid = ctx.gpr[0] as i32;
                 let current = state.process_manager.current_process().unwrap();
-                ctx.gpr[0] = current.borrow_mut().close_descriptor(file_descriptor).map_or(SYSCALL_ERROR_CODE as u32, |_| 0);
+                ctx.gpr[0] = current.borrow_mut().close(fid).map_or(SYSCALL_ERROR_CODE as u32, |_| 0);
             }
             SysCall::Pipe => {
                 let array_ptr = ctx.gpr[0] as *mut u8;

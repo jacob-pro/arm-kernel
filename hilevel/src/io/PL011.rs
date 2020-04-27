@@ -8,6 +8,7 @@ use core::result::Result;
 use crate::io::descriptor::FileDescriptor;
 use alloc::vec::Vec;
 use alloc::string::String;
+use crate::io::FileError;
 
 #[derive(Clone)]
 pub struct PL011(*mut PL011_t);
@@ -41,14 +42,14 @@ impl Write for PL011 {
 
 impl FileDescriptor for PL011 {
 
-    fn read(&self, buffer: &mut [u8]) -> Result<usize, String> {
+    fn read(&self, buffer: &mut [u8]) -> Result<usize, FileError> {
         buffer.iter_mut().for_each(|x| {
             *x = unsafe { PL011_getc(self.0, true) };
         });
         Ok(buffer.len())
     }
 
-    fn write(&self, data: &[u8]) -> Result<usize, String> {
+    fn write(&self, data: &[u8]) -> Result<usize, FileError> {
         data.iter().for_each(|b| {
             unsafe { PL011_putc(self.0, *b, true) };
         });

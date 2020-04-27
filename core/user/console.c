@@ -34,22 +34,25 @@ void gets( char* x, int n ) {
  * into the kernel image, it returns a pointer to the entry point.
  */
 
+extern void main_P2();
 extern void main_P3(); 
 extern void main_P4(); 
 extern void main_P5();
 
 void* load( char* x ) {
-  if     ( 0 == strcmp( x, "P3" ) ) {
-    return &main_P3;
-  }
-  else if( 0 == strcmp( x, "P4" ) ) {
-    return &main_P4;
-  }
-  else if( 0 == strcmp( x, "P5" ) ) {
-    return &main_P5;
-  }
-
-  return NULL;
+    if (strcmp(x, "P2") == 0) {
+        return &main_P2;
+    }
+    if ( 0 == strcmp( x, "P3" ) ) {
+        return &main_P3;
+    }
+    else if( 0 == strcmp( x, "P4" ) ) {
+        return &main_P4;
+    }
+    else if( 0 == strcmp( x, "P5" ) ) {
+        return &main_P5;
+    }
+    return NULL;
 }
 
 /* The behaviour of a console process can be summarised as an infinite 

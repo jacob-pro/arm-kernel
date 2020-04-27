@@ -16,6 +16,7 @@ use crate::process::scheduler::MLFQScheduler;
 use hashbrown::HashMap;
 use alloc::boxed::Box;
 use crate::io::descriptor::{FileDescriptor};
+use crate::io::FileError;
 
 pub type PID = i32;
 
@@ -53,14 +54,6 @@ pub struct ProcessControlBlock {
 
 impl ProcessControlBlock {
 
-    pub fn get_descriptor(&self, fid: i32) -> Option<Rc<dyn FileDescriptor>> {
-        self.file_descriptors.get(&fid).map(|x| Rc::clone(x))
-    }
-
-    pub fn close_descriptor(&mut self, fid: i32) -> Result<(), String> {
-        self.file_descriptors.remove(&fid).map(|x| ()).ok_or("fid not found".to_string())
-    }
-
     fn new(pid: PID, stack: Vec<u8>, context: Context) -> ProcessControlBlock {
         // let tos = stack.last().unwrap() as *const _;
         // let bos = stack.first().unwrap() as *const _;
@@ -74,6 +67,29 @@ impl ProcessControlBlock {
             file_descriptors: HashMap::default()
         }
     }
+
+    pub fn write(&mut self, fid: i32, data: &[u8]) -> Result<usize, FileError> {
+        match self.file_descriptors.get(&fid) {
+            None => { Err(FileError::InvalidDescriptor) },
+            Some(file) => {
+                file.write(data)
+            },
+        }
+    }
+
+    pub fn read(&mut self, fid: i32, buffer: &mut [u8]) -> Result<usize, FileError> {
+        match self.file_descriptors.get(&fid) {
+            None => { Err(FileError::InvalidDescriptor) },
+            Some(file) => {
+                file.read(buffer)
+            },
+        }
+    }
+
+    pub fn close(&mut self, fid: i32) -> Result<(), FileError> {
+        self.file_descriptors.remove(&fid).map(|_| ()).ok_or(FileError::InvalidDescriptor)
+    }
+
 }
 
 impl ProcessManager {
@@ -157,6 +173,7 @@ impl ProcessManager {
             write!(UART0(), "[{}->{}]", prev_pid_str, next.pid).ok();
         });
     }
+
 }
 
 // A heap allocated byte array of length size. Values are uninitialised
