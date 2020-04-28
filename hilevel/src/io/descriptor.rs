@@ -1,8 +1,7 @@
 use alloc::rc::{Rc, Weak};
 use core::cell::RefCell;
 use alloc::collections::VecDeque;
-use crate::io::tasks::Task;
-use alloc::boxed::Box;
+use crate::io::tasks::{ReadTask, WriteTask};
 use num::range;
 
 pub type StrongFileDescriptorRef = Rc<RefCell<dyn FileDescriptor>>;
@@ -15,7 +14,8 @@ pub struct IOResult {
 
 #[derive(Default)]
 pub struct FileDescriptorBase {
-    pending_tasks: VecDeque<Box<dyn Task>>
+    pending_reads: VecDeque<ReadTask>,
+    pending_writes: VecDeque<WriteTask>
 }
 
 pub enum FileError {
@@ -23,20 +23,33 @@ pub enum FileError {
     UnsupportedOperation,
 }
 
-pub fn on_file_event(f: &mut dyn FileDescriptor) {
-    for _i in range(0, f.base().pending_tasks.len()) {
-        let mut popped = f.base().pending_tasks.pop_front().unwrap();
-        let result = (*popped).attempt(f);
-        if result.is_none() { f.base().pending_tasks.push_back(popped) }
-    }
-}
-
+// An "abstract class" for different types of files, accessed through the read/write API
 pub trait FileDescriptor {
 
     fn base(&mut self) -> &mut FileDescriptorBase;
 
-    fn add_pending_task(&mut self, task: Box<dyn Task>) {
-        self.base().pending_tasks.push_back(task)
+    fn add_pending_read(&mut self, task: ReadTask) {
+        self.base().pending_reads.push_back(task)
+    }
+
+    fn add_pending_write(&mut self, task: WriteTask) {
+        self.base().pending_writes.push_back(task)
+    }
+
+    fn notify_pending_readers(&mut self) {
+        for _i in range(0, self.base().pending_reads.len()) {
+            let mut popped = self.base().pending_reads.pop_front().unwrap();
+            let result = popped.attempt(|x| self.read(x) );
+            if result.is_none() { self.base().pending_reads.push_back(popped) }
+        }
+    }
+
+    fn notify_pending_writers(&mut self) {
+        for _i in range(0, self.base().pending_writes.len()) {
+            let mut popped = self.base().pending_writes.pop_front().unwrap();
+            let result = popped.attempt(|x| self.write(x) );
+            if result.is_none() { self.base().pending_writes.push_back(popped) }
+        }
     }
 
     #[allow(unused_variables)]

@@ -1,7 +1,7 @@
 use crate::process::{WeakPcbRef, StrongPcbRef};
 use alloc::rc::Rc;
 use core::slice;
-use crate::io::descriptor::FileDescriptor;
+use crate::io::descriptor::{IOResult, FileError};
 
 pub struct TaskBase {
     process: WeakPcbRef,
@@ -19,11 +19,6 @@ pub struct WriteTask {
     source: *const u8,
 }
 
-pub trait Task {
-    // This task can keep being attempted until a result is given
-    fn attempt(&mut self, file: &mut dyn FileDescriptor) -> Option<u32>;
-}
-
 impl ReadTask {
     pub fn new(process: &StrongPcbRef, destination: *mut u8, length: usize) -> Self {
         ReadTask{ base: TaskBase {
@@ -32,21 +27,10 @@ impl ReadTask {
             length,
         }, destination }
     }
-}
 
-impl WriteTask {
-    pub fn new(process: &StrongPcbRef, source: *const u8, length: usize) -> Self {
-        WriteTask{ base: TaskBase {
-            process: Rc::downgrade(process),
-            completed: 0,
-            length,
-        }, source }
-    }
-}
-
-impl Task for ReadTask {
-
-    fn attempt(&mut self, file: &mut dyn FileDescriptor) -> Option<u32> {
+    pub fn attempt<R>(&mut self, mut reader: R) -> Option<u32>
+        where R: FnMut(&mut [u8]) -> Result<IOResult, FileError>
+    {
         let process = self.base.process.upgrade();
         // If the process is gone, then the task is complete
         process.map_or(Some(self.base.completed as u32), |x| {
@@ -56,7 +40,7 @@ impl Task for ReadTask {
                 let start_from = self.destination.offset(self.base.completed as isize);
                 slice::from_raw_parts_mut(start_from, todo)
             };
-            return match file.read(slice) {
+            return match reader(slice) {
                 Ok(x) => {
                     self.base.completed = self.base.completed + x.bytes;
                     if x.blocked {
@@ -75,11 +59,21 @@ impl Task for ReadTask {
             }
         })
     }
+
 }
 
-impl Task for WriteTask {
+impl WriteTask {
+    pub fn new(process: &StrongPcbRef, source: *const u8, length: usize) -> Self {
+        WriteTask{ base: TaskBase {
+            process: Rc::downgrade(process),
+            completed: 0,
+            length,
+        }, source }
+    }
 
-    fn attempt(&mut self, file: &mut dyn FileDescriptor) -> Option<u32> {
+    pub fn attempt<W>(&mut self, mut writer: W) -> Option<u32>
+        where W: FnMut(&[u8]) -> Result<IOResult, FileError>
+    {
         let process = self.base.process.upgrade();
         // If the process is gone, then the task is complete
         process.map_or(Some(self.base.completed as u32), |x| {
@@ -89,7 +83,7 @@ impl Task for WriteTask {
                 let start_from = self.source.offset(self.base.completed as isize);
                 slice::from_raw_parts(start_from, todo)
             };
-            return match file.write(slice) {
+            return match writer(slice) {
                 Ok(x) => {
                     self.base.completed = self.base.completed + x.bytes;
                     if x.blocked {

@@ -4,6 +4,7 @@
 pub mod PL011;
 pub mod tasks;
 pub mod descriptor;
+pub mod pipe;
 
 use crate::process::FidTable;
 use alloc::rc::Rc;

@@ -31,9 +31,7 @@ use crate::io::PL011;
 use crate::process::{ScheduleSource, Context};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
-use crate::io::tasks::{WriteTask, Task, ReadTask};
-use alloc::boxed::Box;
-use crate::io::descriptor::on_file_event;
+use crate::io::tasks::{WriteTask, ReadTask};
 
 
 #[no_mangle]
@@ -87,13 +85,11 @@ pub extern fn hilevel_handler_irq(ctx: *mut Context) {
             GIC_SOURCE_UART0 => {
                 let mut file = state.io_manager.uart0_ro.borrow_mut();      // The UART0 FileDescriptor
                 (*file).buffer_char_input(PL011_getc(bindings::UART0, true));                   // Add char to the File buffer
-                on_file_event(&mut (*file));                                                       // Complete any pending SysCalls
                 state.process_manager.dispatch(ctx, ScheduleSource::Io);                         // Invoke scheduler
             },
             GIC_SOURCE_UART1 => {
                 let mut file = state.io_manager.uart1_rw.borrow_mut();
                 (*file).buffer_char_input(PL011_getc(bindings::UART1, true));
-                on_file_event(&mut (*file));
                 state.process_manager.dispatch(ctx, ScheduleSource::Io);
             }
             _ => {}
@@ -140,9 +136,9 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
                     Some(file) => {
                         let mut file = (*file).borrow_mut();
                         let mut task = WriteTask::new(&current, start_ptr, length);
-                        match &task.attempt(&mut (*file)) {     // If it completed in one attempt, then set result
-                            None => { file.add_pending_task(Box::new(task)) },      // Otherwise we must wait on the File
-                            Some(r) => { ctx.gpr[0] = *r},
+                        match &task.attempt(|x| file.write(x) ) {
+                            Some(r) => { ctx.gpr[0] = *r},          // If it completed in one attempt, then set result
+                            None => { file.add_pending_write(task) },      // Otherwise we must wait on the File
                         }
                     },
                 }
@@ -158,9 +154,9 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
                     Some(file) => {
                         let mut file = (*file).borrow_mut();
                         let mut task = ReadTask::new(&current, start_ptr, length);
-                        match &task.attempt(&mut (*file)) {     // If it completed in one attempt, then set result
-                            None => { file.add_pending_task(Box::new(task)) },      // Otherwise we must wait on the File
-                            Some(r) => { ctx.gpr[0] = *r},
+                        match &task.attempt(|x| file.read(x) ) {
+                            Some(r) => { ctx.gpr[0] = *r},         // If it completed in one attempt, then set result
+                            None => { file.add_pending_read(task) },      // Otherwise we must wait on the File
                         }
                     },
                 }

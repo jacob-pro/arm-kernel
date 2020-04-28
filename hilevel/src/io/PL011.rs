@@ -7,7 +7,7 @@ use core::result::Result;
 use crate::io::descriptor::{FileDescriptor, FileDescriptorBase, IOResult, FileError};
 use alloc::collections::VecDeque;
 
-const MAX_BUFFER: usize = 4096;
+const KEYBOARD_BUFFER: usize = 4096;
 
 #[derive(Clone)]
 pub struct PL011(*mut PL011_t);
@@ -52,8 +52,9 @@ impl PL011FileDescriptor {
     }
 
     pub fn buffer_char_input(&mut self, char: u8) {
-        if self.read_buffer.len() < MAX_BUFFER {
+        if self.read_buffer.len() < KEYBOARD_BUFFER {
             self.read_buffer.push_back(char);
+            self.notify_pending_readers();
         }
     }
 }
@@ -77,7 +78,7 @@ impl FileDescriptor for PL011FileDescriptor {
         Ok(IOResult{ bytes: idx, blocked: false })
     }
 
-    // This will block kernel, but always return unblocked
+    // This will always return unblocked (kernel must wait)
     fn write(&mut self, data: &[u8]) -> Result<IOResult, FileError> {
         if !self.write { return Err(FileError::UnsupportedOperation) }
         data.iter().for_each(|b| {
