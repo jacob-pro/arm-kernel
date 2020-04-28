@@ -152,3 +152,25 @@ void nice( int pid, int x ) {
 int writestr(int fd, char* string) {
     return write(fd, string, strlen(string));
 }
+
+int pipe(int* fids) {
+    int r;
+    asm volatile( "mov r0, %2 \n" // assign r0 =  fids
+                  "svc %1     \n" // make system call SYS_PIPE
+                  "mov %0, r0 \n" // assign r0 =    r
+    : "=r" (r)
+    : "I" (SYS_PIPE), "r" (fids)
+    : "r0", "r1" );
+    return r;
+}
+
+int close(int fid) {
+    int r;
+    asm volatile( "mov r0, %2 \n" // assign r0 =  fid
+                  "svc %1     \n" // make system call SYS_CLOSE
+                  "mov %0, r0 \n" // assign r0 =    r
+    : "=r" (r)
+    : "I" (SYS_CLOSE), "r" (fid)
+    : "r0", "r1" );
+    return r;
+}
