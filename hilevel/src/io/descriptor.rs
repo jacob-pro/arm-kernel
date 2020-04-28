@@ -1,15 +1,14 @@
-use alloc::rc::{Rc, Weak};
+use alloc::rc::Rc;
 use core::cell::RefCell;
 use alloc::collections::VecDeque;
 use crate::io::tasks::{ReadTask, WriteTask};
 use num::range;
 
 pub type StrongFileDescriptorRef = Rc<RefCell<dyn FileDescriptor>>;
-pub type WeakFileDescriptorRef = Weak<RefCell<dyn FileDescriptor>>;
 
 pub struct IOResult {
     pub bytes: usize,
-    pub blocked: bool
+    pub blocked: bool       // Blocked means that there are more bytes still to be read when the file is ready
 }
 
 #[derive(Default)]

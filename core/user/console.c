@@ -40,6 +40,7 @@ extern void main_P3();
 extern void main_P4(); 
 extern void main_P5();
 extern void main_pipes();
+extern void main_philosopher();
 
 void* load( char* x ) {
     if (strcmp(x, "P2") == 0) {
@@ -56,6 +57,9 @@ void* load( char* x ) {
     }
     else if(strcmp( x, "pipes" ) == 0) {
         return &main_pipes;
+    }
+    else if(strcmp( x, "philosopher" ) == 0) {
+        return &main_philosopher;
     }
     return NULL;
 }

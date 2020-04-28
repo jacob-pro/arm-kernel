@@ -169,10 +169,3 @@ impl MLFQScheduler {
 fn ready(process: &ProcessControlBlock) -> bool {
     process.status == ProcessStatus::Ready
 }
-
-// These tests demonstrate that the scheduler works as per Stage 1b
-#[cfg(test)]
-mod tests {
-
-
-}
