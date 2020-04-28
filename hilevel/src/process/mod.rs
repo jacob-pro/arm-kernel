@@ -169,7 +169,8 @@ impl ProcessManager {
             };
             *ctx = next.context;
             next.status = ProcessStatus::Executing;
-            write!(UART0(), "[{}->{}]", prev_pid_str, next.pid).ok();
+            let next_pid_str = if next.pid == -1 { "I".to_string() } else { next.pid.to_string() };
+            write!(UART0(), "[{}->{}]", prev_pid_str, next_pid_str).ok();
         });
     }
 
