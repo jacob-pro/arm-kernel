@@ -60,9 +60,7 @@ impl PL011FileDescriptor {
 
 impl FileDescriptor for PL011FileDescriptor {
 
-    fn base(&mut self) -> &mut FileDescriptorBase {
-        &mut self.base
-    }
+    fn base(&mut self) -> &mut FileDescriptorBase {&mut self.base}
 
     // This will return blocked until input is available
     fn read(&mut self, buffer: &mut [u8]) -> Result<IOResult, FileError> {
@@ -79,6 +77,7 @@ impl FileDescriptor for PL011FileDescriptor {
         Ok(IOResult{ bytes: idx, blocked: false })
     }
 
+    // This will block kernel, but always return unblocked
     fn write(&mut self, data: &[u8]) -> Result<IOResult, FileError> {
         if !self.write { return Err(FileError::UnsupportedOperation) }
         data.iter().for_each(|b| {

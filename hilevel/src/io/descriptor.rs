@@ -35,7 +35,7 @@ pub trait FileDescriptor {
 
     fn base(&mut self) -> &mut FileDescriptorBase;
 
-    fn add_task(&mut self, task: Box<dyn Task>) {
+    fn add_pending_task(&mut self, task: Box<dyn Task>) {
         self.base().pending_tasks.push_back(task)
     }
 
