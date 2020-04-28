@@ -207,9 +207,13 @@ mod tests {
         assert_eq!(qs, iterated);
     }
 
+    fn new_item() -> StrongPcbRef {
+        Rc::new(RefCell::new(ProcessControlBlock::new(0, Vec::new(), Context::new(0, 0), Default::default())))
+    }
+
     #[test]
     fn contains_remove_test() {
-        let item = Rc::new(RefCell::new(ProcessControlBlock::new(0, Vec::new(), Context::new(0, 0))));
+        let item = new_item();
         let mut mlq = MultiLevelQueue::new(vec![1, 2, 3]);
         assert_eq!(mlq.contains(&item), false);
         mlq.top_queue().borrow_mut().push_front(Rc::clone(&item));
@@ -223,7 +227,7 @@ mod tests {
 
     #[test]
     fn boost_test() {
-        let item = Rc::new(RefCell::new(ProcessControlBlock::new(0, Vec::new(), Context::new(0, 0))));
+        let item= new_item();
         let mut mlq = MultiLevelQueue::new(vec![1, 2, 3]);
         let mut last_queue = mlq.iter().last().unwrap();
         last_queue.borrow_mut().push_back(Rc::clone(&item));
@@ -235,9 +239,9 @@ mod tests {
 
     #[test]
     fn pop_test() {
-        let item1 = Rc::new(RefCell::new(ProcessControlBlock::new(0, Vec::new(), Context::new(0, 0))));
-        let item2 = Rc::new(RefCell::new(ProcessControlBlock::new(0, Vec::new(), Context::new(0, 0))));
-        let item3 = Rc::new(RefCell::new(ProcessControlBlock::new(0, Vec::new(), Context::new(0, 0))));
+        let item1 = new_item();
+        let item2 = new_item();
+        let item3 = new_item();
         let mut mlq = MultiLevelQueue::new(vec![1, 2, 3]);
         let mut last_queue = mlq.iter().last().unwrap();
         mlq.top_queue().borrow_mut().push_back(Rc::clone(&item1));

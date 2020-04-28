@@ -55,10 +55,10 @@ pub struct ProcessControlBlock {
 impl ProcessControlBlock {
 
     fn new(pid: PID, stack: Vec<u8>, context: Context, file_descriptors: FidTable) -> ProcessControlBlock {
-        let tos = stack.last().unwrap() as *const _;
-        let bos = stack.first().unwrap() as *const _;
-        assert!(context.sp <= tos as u32);
-        assert!(context.sp >= bos as u32);
+        // let tos = stack.last().unwrap() as *const _;
+        // let bos = stack.first().unwrap() as *const _;
+        // assert!(context.sp <= tos as u32);
+        // assert!(context.sp >= bos as u32);
         ProcessControlBlock{
             pid,
             status: ProcessStatus::Ready,
