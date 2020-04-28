@@ -1,12 +1,12 @@
 #![allow(non_snake_case)]
 
 use crate::bindings;
-use crate::bindings::PL011_t;
-use crate::bindings::{PL011_putc, PL011_getc, PL011_can_putc, PL011_can_getc};
+use crate::bindings::{PL011_t, PL011_putc, PL011_getc, PL011_can_putc, PL011_can_getc};
 use core::fmt::{Write, Error};
 use core::result::Result;
-use crate::io::descriptor::FileDescriptor;
+use crate::io::descriptor::{FileDescriptor, FileDescriptorBase};
 use crate::io::{FileError, IOResult};
+use crate::io::error::FileError::UnsupportedOperation;
 
 #[derive(Clone)]
 pub struct PL011(*mut PL011_t);
@@ -29,13 +29,37 @@ impl Write for PL011 {
     }
 }
 
-impl FileDescriptor for PL011 {
+pub struct PL011FileDescriptor {
+    internal: PL011,
+    base: FileDescriptorBase,
+    read: bool,
+    write: bool,
+}
+
+impl PL011FileDescriptor {
+    pub fn new(internal: PL011, read: bool, write: bool) -> Self {
+        assert!(read || write);
+        PL011FileDescriptor {
+            internal,
+            base: Default::default(),
+            read,
+            write,
+        }
+    }
+}
+
+impl FileDescriptor for PL011FileDescriptor {
+
+    fn base(&mut self) -> &mut FileDescriptorBase {
+        &mut self.base
+    }
 
     fn read(&self, buffer: &mut [u8]) -> Result<IOResult, FileError> {
+        if !self.read { return Err(UnsupportedOperation) }
         let mut idx = 0;
         while idx < buffer.len() {
-            if unsafe {PL011_can_getc(self.0)} {
-                buffer[idx] = unsafe { PL011_getc(self.0, true) };
+            if unsafe {PL011_can_getc(self.internal.0)} {
+                buffer[idx] = unsafe { PL011_getc(self.internal.0, true) };
                 idx = idx + 1;
             } else {
                 return Ok(IOResult{ bytes: idx, blocked: true })
@@ -45,10 +69,11 @@ impl FileDescriptor for PL011 {
     }
 
     fn write(&self, data: &[u8]) -> Result<IOResult, FileError> {
+        if !self.write { return Err(UnsupportedOperation) }
         let mut idx = 0;
         while idx < data.len() {
-            if unsafe {PL011_can_putc(self.0)} {
-                unsafe { PL011_putc(self.0, data[idx], true) };
+            if unsafe {PL011_can_putc(self.internal.0)} {
+                unsafe { PL011_putc(self.internal.0, data[idx], true) };
                 idx = idx + 1;
             } else {
                 return Ok(IOResult{ bytes: idx, blocked: true })

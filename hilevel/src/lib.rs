@@ -80,9 +80,12 @@ pub extern fn hilevel_handler_irq(ctx: *mut Context) {
                 state.process_manager.dispatch(ctx, ScheduleSource::Timer);
             },
             GIC_SOURCE_UART0 => {
+                state.io_manager.uart0_ro.borrow_mut().on_state_change();
+                state.io_manager.uart0_wo.borrow_mut().on_state_change();
                 state.process_manager.dispatch(ctx, ScheduleSource::Io);
             },
             GIC_SOURCE_UART1 => {
+                state.io_manager.uart1_rw.borrow_mut().on_state_change();
                 state.process_manager.dispatch(ctx, ScheduleSource::Io);
             }
             _ => {}

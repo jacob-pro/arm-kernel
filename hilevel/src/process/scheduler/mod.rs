@@ -140,8 +140,7 @@ impl MLFQScheduler {
 
                 // If there are no new processes and this one is no longer executing then we must idle
                 if next.is_none() && current_status != ProcessStatus::Executing {
-                    let next_p = Rc::clone( &self.idle_process);
-                    dispatch(Some(&mut current.process.borrow_mut()), &mut (*next_p).borrow_mut());
+                    dispatch(Some(&mut current.process.borrow_mut()), &mut (self.idle_process.borrow_mut()));
                     self.current = None;
                 }
 
@@ -151,6 +150,13 @@ impl MLFQScheduler {
 
             ScheduleSource::Io => {
                 // Once IO has completed we may no longer need to idle
+                if self.current.is_none() {
+                    let next = self.queues.pop_process(ready).map(|(next_p, from_q)| {
+                        dispatch(Some(&mut (self.idle_process.borrow_mut())), &mut (*next_p).borrow_mut());
+                        Current::new(next_p, from_q)
+                    });
+                    next.map(|x| { self.current = Some(x); });
+                }
 
             }
         }

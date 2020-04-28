@@ -71,7 +71,8 @@ impl ProcessControlBlock {
         match self.file_descriptors.get(&fid) {
             None => { Err(FileError::InvalidDescriptor) },
             Some(file) => {
-                file.write(data).map(|x| {
+                let res = file.borrow_mut().write(data);
+                res.map(|x| {
                     if x.blocked {
                         self.status = ProcessStatus::Blocked;
                     }
@@ -85,7 +86,8 @@ impl ProcessControlBlock {
         match self.file_descriptors.get(&fid) {
             None => { Err(FileError::InvalidDescriptor) },
             Some(file) => {
-                file.read(buffer).map(|x| {
+                let res = file.borrow_mut().read(buffer);
+                res.map(|x| {
                     if x.blocked {
                         self.status = ProcessStatus::Blocked;
                     }

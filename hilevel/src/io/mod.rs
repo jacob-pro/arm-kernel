@@ -12,7 +12,8 @@ pub use descriptor::IOResult;
 pub use descriptor::StrongFileDescriptorRef;
 use crate::process::FidTable;
 use alloc::rc::Rc;
-use crate::io::PL011::{UART0, UART1};
+use crate::io::PL011::{UART0, UART1, PL011FileDescriptor};
+use core::cell::RefCell;
 
 pub const STDIN_FILENO: i32 = 0;
 pub const STDOUT_FILENO: i32 = 1;
@@ -20,9 +21,9 @@ pub const STDERR_FILENO: i32 = 2;
 pub const UART1_FILENO: i32 = 3;
 
 pub struct IoManager {
-    uart0_ro: StrongFileDescriptorRef,
-    uart0_wo: StrongFileDescriptorRef,
-    uart1_rw: StrongFileDescriptorRef,
+    pub uart0_ro: StrongFileDescriptorRef,
+    pub uart0_wo: StrongFileDescriptorRef,
+    pub uart1_rw: StrongFileDescriptorRef,
 }
 
 impl IoManager {
@@ -45,9 +46,9 @@ impl Default for IoManager {
 
     fn default() -> Self {
         IoManager {
-            uart0_ro: Rc::new(UART0()),
-            uart0_wo: Rc::new(UART0()),
-            uart1_rw: Rc::new(UART1()),
+            uart0_ro: Rc::new(RefCell::new(PL011FileDescriptor::new(UART0(), true, false))),
+            uart0_wo: Rc::new(RefCell::new(PL011FileDescriptor::new(UART0(), false, true))),
+            uart1_rw: Rc::new(RefCell::new(PL011FileDescriptor::new(UART1(), true, true))),
         }
     }
 
