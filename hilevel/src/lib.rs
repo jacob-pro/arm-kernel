@@ -56,7 +56,8 @@ pub extern fn hilevel_handler_rst(ctx: *mut Context) {
         (*UART1).CR          = 0x00000301; // enable UART (Tx+Rx)
 
         (*GICC0).PMR          = 0x000000F0; // unmask all            interrupts
-        (*GICD0).ISENABLER1  |= 0x00001010; // enable timer + UART   interrupts
+        (*GICD0).ISENABLER1  |= 0x00003010; // enable timer (36) + UART0 (44) + UART1 (45)   interrupts
+
         (*GICC0).CTLR         = 0x00000001; // enable GIC interface
         (*GICD0).CTLR         = 0x00000001; // enable GIC distributor
 
