@@ -21,13 +21,12 @@ mod process;
 mod util;
 
 use core::panic::PanicInfo;
-use bindings::TIMER0;
-use bindings::GICC0;
-use bindings::GICD0;
 use bindings::main_console;
+use bindings::{UART0, UART1, GICC0, GICD0, TIMER0};
+use bindings::{GIC_SOURCE_TIMER0, GIC_SOURCE_UART0, GIC_SOURCE_UART1};
 use core::slice;
 use core::fmt::Write;
-use crate::io::PL011::UART0;
+use crate::io::PL011;
 use crate::process::{ScheduleSource, Context};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
@@ -47,15 +46,21 @@ pub extern fn hilevel_handler_rst(ctx: *mut Context) {
         (*TIMER0).Timer1Ctrl |= 0x00000020; // enable          timer interrupt
         (*TIMER0).Timer1Ctrl |= 0x00000080; // enable          timer
 
+        (*UART0).IMSC       |= 0x00000010; // enable UART    (Rx) interrupt
+        (*UART0).CR          = 0x00000301; // enable UART (Tx+Rx)
+
+        (*UART1).IMSC       |= 0x00000010; // enable UART    (Rx) interrupt
+        (*UART1).CR          = 0x00000301; // enable UART (Tx+Rx)
+
         (*GICC0).PMR          = 0x000000F0; // unmask all            interrupts
-        (*GICD0).ISENABLER1  |= 0x00000010; // enable timer          interrupt
+        (*GICD0).ISENABLER1  |= 0x00001010; // enable timer + UART   interrupts
         (*GICC0).CTLR         = 0x00000001; // enable GIC interface
         (*GICD0).CTLR         = 0x00000001; // enable GIC distributor
 
         bindings::int_enable_irq();
     }
 
-    state.process_manager.create_process(main_console);
+    state.process_manager.create_process(main_console, state.io_manager.default_files());
     state.process_manager.dispatch(ctx, ScheduleSource::Reset);
 }
 
@@ -69,9 +74,18 @@ pub extern fn hilevel_handler_irq(ctx: *mut Context) {
         // Read  the interrupt identifier so we know the source.
         let id: u32 = (*GICC0).IAR;
 
-        if id == bindings::GIC_SOURCE_TIMER0 {
-            (*TIMER0).Timer1IntClr = 0x01;
-            state.process_manager.dispatch(ctx, ScheduleSource::Timer);
+        match id {
+            GIC_SOURCE_TIMER0 => {
+                (*TIMER0).Timer1IntClr = 0x01;
+                state.process_manager.dispatch(ctx, ScheduleSource::Timer);
+            },
+            GIC_SOURCE_UART0 => {
+                state.process_manager.dispatch(ctx, ScheduleSource::Io);
+            },
+            GIC_SOURCE_UART1 => {
+                state.process_manager.dispatch(ctx, ScheduleSource::Io);
+            }
+            _ => {}
         }
 
         // Write the interrupt identifier to signal we're done.
@@ -154,7 +168,7 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
 #[panic_handler]
 #[cfg(not(test))]
 fn handle_panic(info: &PanicInfo) -> ! {
-    writeln!(UART0(), "\n{}", info).ok();
+    writeln!(PL011::UART0(), "\n{}", info).ok();
     abort()
 }
 

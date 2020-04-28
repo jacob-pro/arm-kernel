@@ -1,10 +1,12 @@
 use crate::process::ProcessManager;
 use crate::io::PL011::UART0;
 use core::fmt::Write;
+use crate::io::IoManager;
 
 #[derive(Default)]
 pub struct KernelState {
-    pub process_manager: ProcessManager
+    pub process_manager: ProcessManager,
+    pub io_manager: IoManager,
 }
 
 // Mutable statics are treated as unsafe because the compiler does not aware of any

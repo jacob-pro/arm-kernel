@@ -4,17 +4,18 @@ mod context;
 pub use context::Context;
 
 use crate::SysCall;
-use crate::io::PL011::{UART0, UART1};
+use crate::io::PL011::{UART0};
 use core::fmt::Write;
 use alloc::string::{ToString, String};
 use alloc::vec::Vec;
 use alloc::rc::Rc;
 use core::cell::RefCell;
 use crate::process::scheduler::MLFQScheduler;
-use crate::io::{FileError, FileDescriptor, STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO, UART1_FILENO};
+use crate::io::{FileError, StrongFileDescriptorRef};
 use crate::util::IdTable;
 
 pub type PID = i32;
+pub type FidTable = IdTable<i32, StrongFileDescriptorRef>;
 
 const DEFAULT_STACK_BYTES: usize = 0x00001000; // = 4 KiB
 
@@ -37,6 +38,7 @@ pub enum ScheduleSource {
     Svc {id: SysCall},
     Timer,
     Reset,
+    Io,
 }
 
 pub type StrongPcbRef = Rc<RefCell<ProcessControlBlock>>;
@@ -46,24 +48,12 @@ pub struct ProcessControlBlock {
     status: ProcessStatus,
     stack: Vec<u8>,
     context: Context,
-    file_descriptors: IdTable<i32, Rc<dyn FileDescriptor>>,
+    file_descriptors: FidTable,
 }
 
 impl ProcessControlBlock {
 
-    fn default_files() -> IdTable<i32, Rc<dyn FileDescriptor>> {
-        let mut table: IdTable<i32, Rc<dyn FileDescriptor>> = IdTable::default();
-        #[cfg(not(test))]
-        {
-            table.insert(STDIN_FILENO, Rc::new(UART0()));
-            table.insert(STDOUT_FILENO, Rc::new(UART0()));
-            table.insert(STDERR_FILENO, Rc::new(UART0()));
-            table.insert(UART1_FILENO, Rc::new(UART1()));
-        }
-        table
-    }
-
-    fn new(pid: PID, stack: Vec<u8>, context: Context) -> ProcessControlBlock {
+    fn new(pid: PID, stack: Vec<u8>, context: Context, file_descriptors: FidTable) -> ProcessControlBlock {
         let tos = stack.last().unwrap() as *const _;
         let bos = stack.first().unwrap() as *const _;
         assert!(context.sp <= tos as u32);
@@ -73,7 +63,7 @@ impl ProcessControlBlock {
             status: ProcessStatus::Ready,
             stack,
             context,
-            file_descriptors: ProcessControlBlock::default_files(),
+            file_descriptors,
         }
     }
 
@@ -114,11 +104,11 @@ impl ProcessControlBlock {
 impl ProcessManager {
 
     // Create a new process
-    pub fn create_process(&mut self, main: unsafe extern fn()) -> PID {
+    pub fn create_process(&mut self, main: unsafe extern fn(), file_descriptors: FidTable) -> PID {
         let pid = self.table.new_key().unwrap();
         let stack = uninit_bytes(DEFAULT_STACK_BYTES);
         let tos = stack.last().unwrap() as *const _;         // last() because the stack grows downwards from higher -> lower addresses
-        let pcb = ProcessControlBlock::new(pid, stack, Context::new(main as u32, tos as u32));
+        let pcb = ProcessControlBlock::new(pid, stack, Context::new(main as u32, tos as u32), file_descriptors);
         let process = Rc::new(RefCell::new(pcb));
         self.table.insert(pid, Rc::clone(&process));
         self.scheduler.insert_process(Rc::clone(&process));
@@ -146,7 +136,7 @@ impl ProcessManager {
         let mut new_ctx = ctx.clone();
         new_ctx.sp = remapped_sp;
         new_ctx.gpr[0] = 0;
-        let pcb = ProcessControlBlock::new(new_pid, new_stack, new_ctx);
+        let pcb = ProcessControlBlock::new(new_pid, new_stack, new_ctx, borrowed.file_descriptors.clone());
         let process = Rc::new(RefCell::new(pcb));
         self.table.insert(new_pid, Rc::clone(&process));
         self.scheduler.insert_process(Rc::clone(&process));

@@ -1,4 +1,7 @@
 use crate::io::error::FileError;
+use alloc::rc::Rc;
+
+pub type StrongFileDescriptorRef = Rc<dyn FileDescriptor>;
 
 pub struct IOResult {
     pub bytes: usize,

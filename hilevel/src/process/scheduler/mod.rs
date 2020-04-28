@@ -1,13 +1,12 @@
 mod queues;
 mod idle;
 
-use crate::process::{ProcessControlBlock, StrongPcbRef, ScheduleSource, ProcessStatus, Context};
+use crate::process::{ProcessControlBlock, StrongPcbRef, ScheduleSource, ProcessStatus};
 use alloc::rc::Rc;
 use queues::{MultiLevelQueue, LinkedQueues, StrongQueueLevelRef};
 use crate::process::scheduler::queues::QueueLevel;
 use crate::SysCall;
 use core::cell::RefCell;
-use alloc::vec::Vec;
 use crate::process::scheduler::idle::idle_process;
 
 const BOOST_QUANTUM: u32 = 50;
@@ -148,6 +147,11 @@ impl MLFQScheduler {
 
                 // If we were able to switch to a new process, then update current
                 next.map(|n| self.current = Some(n));
+            }
+
+            ScheduleSource::Io => {
+                // Once IO has completed we may no longer need to idle
+
             }
         }
     }

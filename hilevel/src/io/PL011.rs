@@ -19,15 +19,6 @@ pub fn UART1() -> PL011 {
     unsafe { PL011(bindings::UART1) }
 }
 
-pub fn UART2() -> PL011 {
-    unsafe { PL011(bindings::UART2) }
-}
-
-pub fn UART3() -> PL011 {
-    unsafe { PL011(bindings::UART3) }
-}
-
-
 impl Write for PL011 {
 
     fn write_str(&mut self, s: &str) -> Result<(), Error> {
