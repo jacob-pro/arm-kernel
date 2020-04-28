@@ -1,10 +1,11 @@
 #![allow(non_snake_case)]
 
 use crate::bindings;
-use crate::bindings::{PL011_t, PL011_putc, PL011_getc, PL011_can_getc};
+use crate::bindings::{PL011_t, PL011_putc};
 use core::fmt::{Write, Error};
 use core::result::Result;
 use crate::io::descriptor::{FileDescriptor, FileDescriptorBase, IOResult, FileError};
+use alloc::collections::VecDeque;
 
 #[derive(Clone)]
 pub struct PL011(*mut PL011_t);
@@ -32,9 +33,11 @@ pub struct PL011FileDescriptor {
     base: FileDescriptorBase,
     read: bool,
     write: bool,
+    read_buffer: VecDeque<u8>,
 }
 
 impl PL011FileDescriptor {
+
     pub fn new(internal: PL011, read: bool, write: bool) -> Self {
         assert!(read || write);
         PL011FileDescriptor {
@@ -42,7 +45,12 @@ impl PL011FileDescriptor {
             base: Default::default(),
             read,
             write,
+            read_buffer: Default::default()
         }
+    }
+
+    pub fn buffer_char_input(&mut self, char: u8) {
+        self.read_buffer.push_back(char);
     }
 }
 
@@ -52,16 +60,16 @@ impl FileDescriptor for PL011FileDescriptor {
         &mut self.base
     }
 
-    // This will block until input is received
+    // This will return blocked until input is available
     fn read(&mut self, buffer: &mut [u8]) -> Result<IOResult, FileError> {
         if !self.read { return Err(FileError::UnsupportedOperation) }
         let mut idx = 0;
         while idx < buffer.len() {
-            if unsafe {PL011_can_getc(self.internal.0)} {
-                buffer[idx] = unsafe { PL011_getc(self.internal.0, true) };
-                idx = idx + 1;
-            } else {
+            if self.read_buffer.is_empty() {
                 return Ok(IOResult{ bytes: idx, blocked: true })
+            } else {
+                buffer[idx] = self.read_buffer.pop_front().unwrap();
+                idx = idx + 1;
             }
         };
         Ok(IOResult{ bytes: idx, blocked: false })

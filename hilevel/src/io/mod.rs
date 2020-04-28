@@ -17,9 +17,9 @@ pub const STDERR_FILENO: i32 = 2;
 pub const UART1_FILENO: i32 = 3;
 
 pub struct IoManager {
-    pub uart0_ro: StrongFileDescriptorRef,
-    pub uart0_wo: StrongFileDescriptorRef,
-    pub uart1_rw: StrongFileDescriptorRef,
+    pub uart0_ro: Rc<RefCell<PL011FileDescriptor>>,
+    pub uart0_wo: Rc<RefCell<PL011FileDescriptor>>,
+    pub uart1_rw: Rc<RefCell<PL011FileDescriptor>>,
 }
 
 impl IoManager {
@@ -28,10 +28,10 @@ impl IoManager {
         let mut table = FidTable::default();
         #[cfg(not(test))]
             {
-                table.insert(STDIN_FILENO, Rc::clone(&self.uart0_ro));
-                table.insert(STDOUT_FILENO, Rc::clone(&self.uart0_wo));
-                table.insert(STDERR_FILENO, Rc::clone(&self.uart0_wo));
-                table.insert(UART1_FILENO, Rc::clone(&self.uart1_rw));
+                table.insert(STDIN_FILENO, Rc::clone(&self.uart0_ro) as StrongFileDescriptorRef);
+                table.insert(STDOUT_FILENO, Rc::clone(&self.uart0_wo) as StrongFileDescriptorRef);
+                table.insert(STDERR_FILENO, Rc::clone(&self.uart0_wo) as StrongFileDescriptorRef);
+                table.insert(UART1_FILENO, Rc::clone(&self.uart1_rw) as StrongFileDescriptorRef);
             }
         table
     }

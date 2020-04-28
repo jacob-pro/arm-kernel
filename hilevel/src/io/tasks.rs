@@ -4,7 +4,7 @@ use core::slice;
 use crate::io::descriptor::FileDescriptor;
 
 pub struct TaskBase {
-    process: WeakPcbRef,                // Weak because we don't want ownership
+    process: WeakPcbRef,
     completed: usize,
     length: usize,
 }
