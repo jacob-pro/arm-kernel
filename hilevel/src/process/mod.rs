@@ -8,11 +8,11 @@ use crate::io::PL011::{UART0};
 use core::fmt::Write;
 use alloc::string::{ToString, String};
 use alloc::vec::Vec;
-use alloc::rc::Rc;
+use alloc::rc::{Rc, Weak};
 use core::cell::RefCell;
 use crate::process::scheduler::MLFQScheduler;
-use crate::io::{FileError, StrongFileDescriptorRef};
 use crate::util::IdTable;
+use crate::io::descriptor::StrongFileDescriptorRef;
 
 pub type PID = i32;
 pub type FidTable = IdTable<i32, StrongFileDescriptorRef>;
@@ -42,6 +42,7 @@ pub enum ScheduleSource {
 }
 
 pub type StrongPcbRef = Rc<RefCell<ProcessControlBlock>>;
+pub type WeakPcbRef = Weak<RefCell<ProcessControlBlock>>;
 
 pub struct ProcessControlBlock {
     pid: PID,
@@ -67,38 +68,24 @@ impl ProcessControlBlock {
         }
     }
 
-    pub fn write(&mut self, fid: i32, data: &[u8]) -> Result<usize, FileError> {
-        match self.file_descriptors.get(&fid) {
-            None => { Err(FileError::InvalidDescriptor) },
-            Some(file) => {
-                let res = file.borrow_mut().write(data);
-                res.map(|x| {
-                    if x.blocked {
-                        self.status = ProcessStatus::Blocked;
-                    }
-                    x.bytes
-                })
-            },
+    // A syscall that hasn't completed should call this
+    pub fn set_blocked(&mut self) {
+        self.status = ProcessStatus::Blocked;
+    }
+    // When the syscall can complete, it can return the result to the process
+    pub fn set_unblocked(&mut self, result: u32) {
+        if self.status == ProcessStatus::Blocked {
+            self.status = ProcessStatus::Ready;
         }
+        self.context.gpr[0] = result;
     }
 
-    pub fn read(&mut self, fid: i32, buffer: &mut [u8]) -> Result<usize, FileError> {
-        match self.file_descriptors.get(&fid) {
-            None => { Err(FileError::InvalidDescriptor) },
-            Some(file) => {
-                let res = file.borrow_mut().read(buffer);
-                res.map(|x| {
-                    if x.blocked {
-                        self.status = ProcessStatus::Blocked;
-                    }
-                    x.bytes
-                })
-            },
-        }
+    pub fn get_file(&self, fid: i32) -> Option<StrongFileDescriptorRef> {
+        self.file_descriptors.get(&fid).map(|x| Rc::clone(x))
     }
 
-    pub fn close(&mut self, fid: i32) -> Result<(), FileError> {
-        self.file_descriptors.remove(&fid).map(|_| ()).ok_or(FileError::InvalidDescriptor)
+    pub fn close_file(&mut self, fid: i32) -> Result<(), String> {
+        self.file_descriptors.remove(&fid).map(|_| ()).ok_or("invalid fid".to_string())
     }
 
 }

@@ -2,18 +2,14 @@
 #![allow(dead_code)]
 
 pub mod PL011;
+pub mod tasks;
+pub mod descriptor;
 
-mod error;
-mod descriptor;
-
-pub use error::FileError;
-pub use descriptor::FileDescriptor;
-pub use descriptor::IOResult;
-pub use descriptor::StrongFileDescriptorRef;
 use crate::process::FidTable;
 use alloc::rc::Rc;
 use crate::io::PL011::{UART0, UART1, PL011FileDescriptor};
 use core::cell::RefCell;
+use crate::io::descriptor::StrongFileDescriptorRef;
 
 pub const STDIN_FILENO: i32 = 0;
 pub const STDOUT_FILENO: i32 = 1;

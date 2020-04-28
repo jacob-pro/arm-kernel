@@ -1,12 +1,10 @@
 #![allow(non_snake_case)]
 
 use crate::bindings;
-use crate::bindings::{PL011_t, PL011_putc, PL011_getc, PL011_can_putc, PL011_can_getc};
+use crate::bindings::{PL011_t, PL011_putc, PL011_getc, PL011_can_getc};
 use core::fmt::{Write, Error};
 use core::result::Result;
-use crate::io::descriptor::{FileDescriptor, FileDescriptorBase};
-use crate::io::{FileError, IOResult};
-use crate::io::error::FileError::UnsupportedOperation;
+use crate::io::descriptor::{FileDescriptor, FileDescriptorBase, IOResult, FileError};
 
 #[derive(Clone)]
 pub struct PL011(*mut PL011_t);
@@ -54,8 +52,9 @@ impl FileDescriptor for PL011FileDescriptor {
         &mut self.base
     }
 
-    fn read(&self, buffer: &mut [u8]) -> Result<IOResult, FileError> {
-        if !self.read { return Err(UnsupportedOperation) }
+    // This will block until input is received
+    fn read(&mut self, buffer: &mut [u8]) -> Result<IOResult, FileError> {
+        if !self.read { return Err(FileError::UnsupportedOperation) }
         let mut idx = 0;
         while idx < buffer.len() {
             if unsafe {PL011_can_getc(self.internal.0)} {
@@ -68,18 +67,12 @@ impl FileDescriptor for PL011FileDescriptor {
         Ok(IOResult{ bytes: idx, blocked: false })
     }
 
-    fn write(&self, data: &[u8]) -> Result<IOResult, FileError> {
-        if !self.write { return Err(UnsupportedOperation) }
-        let mut idx = 0;
-        while idx < data.len() {
-            if unsafe {PL011_can_putc(self.internal.0)} {
-                unsafe { PL011_putc(self.internal.0, data[idx], true) };
-                idx = idx + 1;
-            } else {
-                return Ok(IOResult{ bytes: idx, blocked: true })
-            }
-        };
-        Ok(IOResult{ bytes: idx, blocked: false })
+    fn write(&mut self, data: &[u8]) -> Result<IOResult, FileError> {
+        if !self.write { return Err(FileError::UnsupportedOperation) }
+        data.iter().for_each(|b| {
+            unsafe { PL011_putc(self.internal.0, *b, true) };
+        });
+        Ok(IOResult{ bytes: data.len(), blocked: false })
     }
 
 }

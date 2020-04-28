@@ -30,6 +30,9 @@ use crate::io::PL011;
 use crate::process::{ScheduleSource, Context};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
+use crate::io::tasks::{WriteTask, Task, ReadTask};
+use alloc::boxed::Box;
+use crate::io::descriptor::on_file_event;
 
 
 #[no_mangle]
@@ -80,12 +83,11 @@ pub extern fn hilevel_handler_irq(ctx: *mut Context) {
                 state.process_manager.dispatch(ctx, ScheduleSource::Timer);
             },
             GIC_SOURCE_UART0 => {
-                state.io_manager.uart0_ro.borrow_mut().on_state_change();
-                state.io_manager.uart0_wo.borrow_mut().on_state_change();
+                on_file_event(&mut (*state.io_manager.uart0_ro.borrow_mut()));
                 state.process_manager.dispatch(ctx, ScheduleSource::Io);
             },
             GIC_SOURCE_UART1 => {
-                state.io_manager.uart1_rw.borrow_mut().on_state_change();
+                on_file_event(&mut (*state.io_manager.uart1_rw.borrow_mut()));
                 state.process_manager.dispatch(ctx, ScheduleSource::Io);
             }
             _ => {}
@@ -125,17 +127,39 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
                 let fid = ctx.gpr[0] as i32;
                 let start_ptr = ctx.gpr[1] as *const u8;
                 let length = ctx.gpr[2] as usize;
-                let slice = unsafe { slice::from_raw_parts(start_ptr, length) };
+
                 let current = state.process_manager.current_process().unwrap();
-                ctx.gpr[0] = current.borrow_mut().write(fid, slice).map_or(MINUS_ONE as u32, |read| read as u32);
+                let file = current.borrow().get_file(fid);
+                match file {
+                    None => { ctx.gpr[0] = MINUS_ONE as u32},     // Invalid FID
+                    Some(file) => {
+                        let mut file = (*file).borrow_mut();
+                        let mut task = WriteTask::new(&current, start_ptr, length);
+                        match &task.attempt(&mut (*file)) {
+                            None => { file.add_task(Box::new(task)) },
+                            Some(r) => { ctx.gpr[0] = *r},
+                        }
+                    },
+                }
             }
             SysCall::Read => {
                 let fid = ctx.gpr[0] as i32;
                 let start_ptr = ctx.gpr[1] as *mut u8;
                 let length = ctx.gpr[2] as usize;
-                let slice = unsafe { slice::from_raw_parts_mut(start_ptr, length) };
+
                 let current = state.process_manager.current_process().unwrap();
-                ctx.gpr[0] = current.borrow_mut().read(fid, slice).map_or(MINUS_ONE as u32, |written| written as u32);
+                let file = current.borrow().get_file(fid);
+                match file {
+                    None => { ctx.gpr[0] = MINUS_ONE as u32},       // Invalid FID
+                    Some(file) => {
+                        let mut file = (*file).borrow_mut();
+                        let mut task = ReadTask::new(&current, start_ptr, length);
+                        match &task.attempt(&mut (*file)) {
+                            None => { file.add_task(Box::new(task)) },
+                            Some(r) => { ctx.gpr[0] = *r},
+                        }
+                    },
+                }
             }
             SysCall::Fork => {
                 ctx.gpr[0] = state.process_manager.fork(ctx) as u32;
@@ -157,7 +181,7 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
             SysCall::Close => {
                 let fid = ctx.gpr[0] as i32;
                 let current = state.process_manager.current_process().unwrap();
-                ctx.gpr[0] = current.borrow_mut().close(fid).map_or(MINUS_ONE as u32, |_| 0);
+                ctx.gpr[0] = current.borrow_mut().close_file(fid).map_or(MINUS_ONE as u32, |_| 0);
             }
             SysCall::Pipe => {
                 let array_ptr = ctx.gpr[0] as *mut u8;
