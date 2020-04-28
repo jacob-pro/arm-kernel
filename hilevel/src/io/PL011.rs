@@ -7,6 +7,8 @@ use core::result::Result;
 use crate::io::descriptor::{FileDescriptor, FileDescriptorBase, IOResult, FileError};
 use alloc::collections::VecDeque;
 
+const MAX_BUFFER: usize = 4096;
+
 #[derive(Clone)]
 pub struct PL011(*mut PL011_t);
 
@@ -50,7 +52,9 @@ impl PL011FileDescriptor {
     }
 
     pub fn buffer_char_input(&mut self, char: u8) {
-        self.read_buffer.push_back(char);
+        if self.read_buffer.len() < MAX_BUFFER {
+            self.read_buffer.push_back(char);
+        }
     }
 }
 
