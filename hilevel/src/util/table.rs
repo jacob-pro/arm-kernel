@@ -33,7 +33,7 @@ impl <K, V> Default for IdTable<K, V>
 impl <K, V> IdTable<K, V>
     where K: Integer + Bounded + FromPrimitive + Step
 {
-    pub fn new_pid(&self) -> Option<K> {
+    pub fn new_key(&self) -> Option<K> {
         match self.0.last_key_value().map(|x| x.0.to_owned()) {
             Some(x) => {
                 if x < K::max_value() {
@@ -61,23 +61,23 @@ mod tests {
     use crate::util::IdTable;
 
     #[test]
-    fn new_pid_test() {
+    fn new_key_test() {
         let object = "Hello".to_owned();
 
         // An empty table first id should be 0
         let mut table: IdTable<i32, String> = IdTable::default();
-        assert_eq!(table.new_pid().unwrap(), 0);
+        assert_eq!(table.new_key().unwrap(), 0);
 
         // A table with lowest id 0, next should be 1
         table.insert(0, object.clone());
-        assert_eq!(table.new_pid().unwrap(), 1);
+        assert_eq!(table.new_key().unwrap(), 1);
 
         // A table with lowest id 5, next should be 6
         table.insert(5, object.clone());
-        assert_eq!(table.new_pid().unwrap(), 6);
+        assert_eq!(table.new_key().unwrap(), 6);
 
         // A table that has been filled up, should loop back around and find first gap after 0
         table.insert(i32::MAX, object.clone());
-        assert_eq!(table.new_pid().unwrap(), 1);
+        assert_eq!(table.new_key().unwrap(), 1);
     }
 }

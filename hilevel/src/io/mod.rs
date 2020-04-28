@@ -8,6 +8,7 @@ mod descriptor;
 
 pub use error::FileError;
 pub use descriptor::FileDescriptor;
+pub use descriptor::IOResult;
 
 pub const STDIN_FILENO: i32 = 0;
 pub const STDOUT_FILENO: i32 = 1;

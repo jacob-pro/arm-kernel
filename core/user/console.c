@@ -13,19 +13,20 @@
  */
 
 void puts( char* x, int n ) {
-  for( int i = 0; i < n; i++ ) {
-    PL011_putc( UART1, x[ i ], true );
-  }
+    write(UART1_FILENO, x, n);
+//  for( int i = 0; i < n; i++ ) {
+//    PL011_putc( UART1, x[ i ], true );
+//  }
 }
 
 void gets( char* x, int n ) {
-  for( int i = 0; i < n; i++ ) {
-    x[ i ] = PL011_getc( UART1, true );
-    
-    if( x[ i ] == '\x0A' ) {
-      x[ i ] = '\x00'; break;
+    for( int i = 0; i < n; i++ ) {
+        //x[i] = PL011_getc( UART1, true );
+        read(UART1_FILENO, &x[i], 1);
+        if(x[i] == '\x0A') {
+            x[i] = '\x00'; break;
+        }
     }
-  }
 }
 
 /* Since we lack a *real* loader (as a result of also lacking a storage

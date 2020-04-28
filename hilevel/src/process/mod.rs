@@ -24,12 +24,13 @@ pub struct ProcessManager {
     scheduler: MLFQScheduler,
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum ProcessStatus {
     Ready,
     Executing,
     Exited,
     Terminated,
+    Blocked,
 }
 
 pub enum ScheduleSource {
@@ -63,10 +64,10 @@ impl ProcessControlBlock {
     }
 
     fn new(pid: PID, stack: Vec<u8>, context: Context) -> ProcessControlBlock {
-        // let tos = stack.last().unwrap() as *const _;
-        // let bos = stack.first().unwrap() as *const _;
-        // assert!(context.sp <= tos as u32);
-        // assert!(context.sp >= bos as u32);
+        let tos = stack.last().unwrap() as *const _;
+        let bos = stack.first().unwrap() as *const _;
+        assert!(context.sp <= tos as u32);
+        assert!(context.sp >= bos as u32);
         ProcessControlBlock{
             pid,
             status: ProcessStatus::Ready,
@@ -80,7 +81,12 @@ impl ProcessControlBlock {
         match self.file_descriptors.get(&fid) {
             None => { Err(FileError::InvalidDescriptor) },
             Some(file) => {
-                file.write(data)
+                file.write(data).map(|x| {
+                    if x.blocked {
+                        self.status = ProcessStatus::Blocked;
+                    }
+                    x.bytes
+                })
             },
         }
     }
@@ -89,7 +95,12 @@ impl ProcessControlBlock {
         match self.file_descriptors.get(&fid) {
             None => { Err(FileError::InvalidDescriptor) },
             Some(file) => {
-                file.read(buffer)
+                file.read(buffer).map(|x| {
+                    if x.blocked {
+                        self.status = ProcessStatus::Blocked;
+                    }
+                    x.bytes
+                })
             },
         }
     }
@@ -104,7 +115,7 @@ impl ProcessManager {
 
     // Create a new process
     pub fn create_process(&mut self, main: unsafe extern fn()) -> PID {
-        let pid = self.table.new_pid().unwrap();
+        let pid = self.table.new_key().unwrap();
         let stack = uninit_bytes(DEFAULT_STACK_BYTES);
         let tos = stack.last().unwrap() as *const _;         // last() because the stack grows downwards from higher -> lower addresses
         let pcb = ProcessControlBlock::new(pid, stack, Context::new(main as u32, tos as u32));
@@ -129,7 +140,7 @@ impl ProcessManager {
     pub fn fork(&mut self, ctx: &Context) -> PID {
         let current = self.scheduler.current_process().unwrap();
         let borrowed = current.borrow();
-        let new_pid = self.table.new_pid().unwrap();
+        let new_pid = self.table.new_key().unwrap();
         let new_stack = borrowed.stack.clone();
         let remapped_sp = adjust_sp(&borrowed.stack, &new_stack, ctx.sp);
         let mut new_ctx = ctx.clone();
@@ -156,7 +167,6 @@ impl ProcessManager {
         let mut borrowed = current.borrow_mut();
         borrowed.status = ProcessStatus::Exited;
         self.table.remove(&borrowed.pid);
-        self.scheduler.remove_process(&current).unwrap();
         write!(UART0(), "[{} Exited]", borrowed.pid).ok();
     }
 
@@ -169,7 +179,9 @@ impl ProcessManager {
             let prev_pid_str = match prev {
                 Some(mut x) => {
                     x.context = *ctx;
-                    x.status = ProcessStatus::Ready;
+                    if x.status == ProcessStatus::Executing {   //Only if the previous was in an executing state, e.g. not waiting
+                        x.status = ProcessStatus::Ready;
+                    }
                     x.pid.to_string()
                 },
                 None => {
@@ -185,7 +197,7 @@ impl ProcessManager {
 }
 
 // A heap allocated byte array of length size. Values are uninitialised
-fn uninit_bytes(size: usize) -> Vec<u8> {
+pub fn uninit_bytes(size: usize) -> Vec<u8> {
     let mut stack: Vec<u8> = Vec::with_capacity(size);
     unsafe { stack.set_len(size) };
     stack
