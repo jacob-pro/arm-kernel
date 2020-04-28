@@ -51,12 +51,14 @@ impl PL011FileDescriptor {
         }
     }
 
+    // Add chars to the input buffer, then notify any blocked readers
     pub fn buffer_char_input(&mut self, char: u8) {
         if self.read_buffer.len() < KEYBOARD_BUFFER {
             self.read_buffer.push_back(char);
             self.notify_pending_readers();
         }
     }
+
 }
 
 impl FileDescriptor for PL011FileDescriptor {

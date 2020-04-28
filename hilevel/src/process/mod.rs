@@ -88,6 +88,12 @@ impl ProcessControlBlock {
         self.file_descriptors.remove(&fid).map(|_| ()).ok_or("invalid fid".to_string())
     }
 
+    pub fn add_file(&mut self, file: StrongFileDescriptorRef) -> i32 {
+        let fid = self.file_descriptors.new_key().unwrap();
+        self.file_descriptors.insert(fid, file);
+        fid
+    }
+
 }
 
 impl ProcessManager {

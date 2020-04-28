@@ -77,7 +77,7 @@ extern int  kill( pid_t pid, int x );
 // for process identified by pid, set  priority to x
 extern void nice( pid_t pid, int x );
 
-// Create an unnamed pipe
+// Create an unnamed pipe, [0] = Read End, [1] = Write End
 int pipe(int [2]);
 
 // Close a file descriptor

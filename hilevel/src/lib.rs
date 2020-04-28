@@ -32,6 +32,7 @@ use crate::process::{ScheduleSource, Context};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use crate::io::tasks::{WriteTask, ReadTask};
+use crate::io::pipe::new_pipe;
 
 
 #[no_mangle]
@@ -137,8 +138,8 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
                         let mut file = (*file).borrow_mut();
                         let mut task = WriteTask::new(&current, start_ptr, length);
                         match &task.attempt(|x| file.write(x) ) {
-                            Some(r) => { ctx.gpr[0] = *r},          // If it completed in one attempt, then set result
-                            None => { file.add_pending_write(task) },      // Otherwise we must wait on the File
+                            Some(r) => { ctx.gpr[0] = *r},          // If task completed in one attempt, then set result
+                            None => { file.add_pending_write(task) },      // Otherwise we must wait on the File to unblock
                         }
                     },
                 }
@@ -155,8 +156,8 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
                         let mut file = (*file).borrow_mut();
                         let mut task = ReadTask::new(&current, start_ptr, length);
                         match &task.attempt(|x| file.read(x) ) {
-                            Some(r) => { ctx.gpr[0] = *r},         // If it completed in one attempt, then set result
-                            None => { file.add_pending_read(task) },      // Otherwise we must wait on the File
+                            Some(r) => { ctx.gpr[0] = *r},         // If task completed in one attempt, then set result
+                            None => { file.add_pending_read(task) },      // Otherwise we must wait on the File to unblock
                         }
                     },
                 }
@@ -184,8 +185,13 @@ pub extern fn hilevel_handler_svc(ctx: *mut Context, id: u32) {
                 ctx.gpr[0] = current.borrow_mut().close_file(fid).map_or(MINUS_ONE as u32, |_| 0);
             }
             SysCall::Pipe => {
-                let array_ptr = ctx.gpr[0] as *mut u8;
-                let _slice = unsafe { slice::from_raw_parts_mut(array_ptr, 2) };
+                let array_ptr = ctx.gpr[0] as *mut i32;
+                let slice = unsafe { slice::from_raw_parts_mut(array_ptr, 2) };
+                let current = state.process_manager.current_process().unwrap();
+                let (read, write) = new_pipe();
+                slice[0] = current.borrow_mut().add_file(read);
+                slice[1] = current.borrow_mut().add_file(write);
+                ctx.gpr[0] = 0;
             }
         }
         state.process_manager.dispatch(ctx, ScheduleSource::Svc {id});
