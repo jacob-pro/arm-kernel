@@ -29,7 +29,15 @@ void main_pipes() {
     writestr(STDOUT_FILENO, "\nRead from pipe: ");
     write(STDOUT_FILENO, buffer, 4);
 
-    writestr(STDOUT_FILENO, "\nAttempting to read more bytes will cause deadlock...");
+    writestr(STDOUT_FILENO, "\nClosing write end");
+    close(write_fid);
+    int write_result = write(write_fid, input, 4);
+    char write_result_str[10];
+    itoa(write_result_str, write_result);
+    writestr(STDOUT_FILENO, "\nAttempting to write to closed pipe returned: ");
+    writestr(STDOUT_FILENO, write_result_str);
+
+    writestr(STDOUT_FILENO, "\nAttempting to read more bytes will cause a deadlock...");
     read(read_fid, buffer, 1);
 
     exit(EXIT_SUCCESS);
