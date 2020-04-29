@@ -164,7 +164,7 @@ impl ProcessManager {
             let prev_pid_str = match prev {
                 Some(mut x) => {
                     x.context = *ctx;
-                    if x.status == ProcessStatus::Executing {   //Only if the previous was in an executing state, e.g. not waiting
+                    if x.status == ProcessStatus::Executing {   //Only if the previous was still in an executing state, e.g. not waiting
                         x.status = ProcessStatus::Ready;
                     }
                     x.pid.to_string()

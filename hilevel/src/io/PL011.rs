@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use crate::bindings;
-use crate::bindings::{PL011_t, PL011_putc};
+use crate::bindings::{PL011_t, PL011_putc, PL011_getc};
 use core::fmt::{Write, Error};
 use core::result::Result;
 use crate::io::descriptor::{FileDescriptor, FileDescriptorBase, IOResult, FileError};
@@ -20,11 +20,20 @@ pub fn UART1() -> PL011 {
     unsafe { PL011(bindings::UART1) }
 }
 
+impl PL011 {
+    fn putc(&self, byte: u8, blocking: bool) {
+        unsafe { PL011_putc(self.0, byte, blocking) };
+    }
+    fn getc(&self, blocking: bool) -> u8 {
+        unsafe { PL011_getc(self.0, blocking) }
+    }
+}
+
 impl Write for PL011 {
 
     fn write_str(&mut self, s: &str) -> Result<(), Error> {
         s.as_bytes().iter().for_each(|b| {
-            unsafe { PL011_putc(self.0, *b, true) };
+            self.putc(*b, true);
         });
         Ok(())
     }
@@ -52,7 +61,8 @@ impl PL011FileDescriptor {
     }
 
     // Add chars to the input buffer, then notify any blocked readers
-    pub fn buffer_char_input(&mut self, char: u8) {
+    pub fn on_interrupt(&mut self) {
+        let char = self.internal.getc(true);
         if self.read_buffer.len() < KEYBOARD_BUFFER {
             self.read_buffer.push_back(char);
             self.notify_pending_readers();
@@ -80,11 +90,10 @@ impl FileDescriptor for PL011FileDescriptor {
         Ok(IOResult{ bytes: idx, blocked: false })
     }
 
-    // This will always return unblocked (kernel must wait)
     fn write(&mut self, data: &[u8]) -> Result<IOResult, FileError> {
         if !self.write { return Err(FileError::UnsupportedOperation) }
         data.iter().for_each(|b| {
-            unsafe { PL011_putc(self.internal.0, *b, true) };
+            self.internal.putc(*b, true);
         });
         Ok(IOResult{ bytes: data.len(), blocked: false })
     }

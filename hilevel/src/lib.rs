@@ -24,7 +24,6 @@ use core::panic::PanicInfo;
 use bindings::main_console;
 use bindings::{UART0, UART1, GICC0, GICD0, TIMER0};
 use bindings::{GIC_SOURCE_TIMER0, GIC_SOURCE_UART0, GIC_SOURCE_UART1};
-use bindings::PL011_getc;
 use core::slice;
 use core::fmt::Write;
 use crate::io::PL011;
@@ -84,13 +83,13 @@ pub extern fn hilevel_handler_irq(ctx: *mut Context) {
                 state.process_manager.dispatch(ctx, ScheduleSource::Timer);
             },
             GIC_SOURCE_UART0 => {
-                let mut file = state.io_manager.uart0_ro.borrow_mut();      // The UART0 FileDescriptor
-                (*file).buffer_char_input(PL011_getc(bindings::UART0, true));                   // Add char to the File buffer
+                let mut uart0 = state.io_manager.uart0_ro.borrow_mut();      // The UART0 FileDescriptor
+                (*uart0).on_interrupt();                                                          // Add char to the File buffer
                 state.process_manager.dispatch(ctx, ScheduleSource::Io);                         // Invoke scheduler
             },
             GIC_SOURCE_UART1 => {
-                let mut file = state.io_manager.uart1_rw.borrow_mut();
-                (*file).buffer_char_input(PL011_getc(bindings::UART1, true));
+                let mut uart1 = state.io_manager.uart1_rw.borrow_mut();
+                (*uart1).on_interrupt();
                 state.process_manager.dispatch(ctx, ScheduleSource::Io);
             }
             _ => {}
