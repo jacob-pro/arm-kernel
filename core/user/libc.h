@@ -83,7 +83,4 @@ int pipe(int [2]);
 // Close a file descriptor
 int close(int fd);
 
-// Wrapper for write
-int writestr(int fd, char* string);
-
 #endif

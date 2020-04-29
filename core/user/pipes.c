@@ -1,4 +1,9 @@
 #include "pipes.h"
+#include <string.h>
+
+int writestr(int fd, char* string) {
+    return write(fd, string, strlen(string));
+}
 
 void main_pipes() {
 
@@ -37,7 +42,7 @@ void main_pipes() {
     writestr(STDOUT_FILENO, "\nAttempting to write to closed pipe returned: ");
     writestr(STDOUT_FILENO, write_result_str);
 
-    writestr(STDOUT_FILENO, "\nAttempting to read more bytes will cause a deadlock...");
+    writestr(STDOUT_FILENO, "\nAttempting to read more bytes will cause a deadlock...\n");
     read(read_fid, buffer, 1);
 
     exit(EXIT_SUCCESS);
