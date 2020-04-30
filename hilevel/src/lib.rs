@@ -37,7 +37,7 @@ use crate::io::pipe::new_pipe;
 #[no_mangle]
 #[cfg(not(test))]
 pub extern fn hilevel_handler_rst(ctx: *mut Context) {
-    unsafe { bindings::int_disable_irq(); }
+    unsafe { bindings::int_unable_irq(); }
     let ctx = unsafe { &mut *ctx};
     let state = state::init();
 
