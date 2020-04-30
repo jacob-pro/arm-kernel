@@ -31,7 +31,7 @@ resources is allowed *iff.* it
 Let us know any third-party source code or resources you used (if any) so
 it's clear what's your work and what isn't:
 
-[No third party code is included within the submission, however there are some dependencies / libraries which are linked to. These are all specified within `./hilevel/Cargo.toml`]
+[No third party code is included within the zip, however there are some dependencies / libraries which are linked to. These are all specified within `./hilevel/Cargo.toml`]
 
 -------------------------------------------------------------------------------
 
