@@ -37,6 +37,7 @@ use crate::io::pipe::new_pipe;
 #[no_mangle]
 #[cfg(not(test))]
 pub extern fn hilevel_handler_rst(ctx: *mut Context) {
+    unsafe { bindings::int_disable_irq(); }
     let ctx = unsafe { &mut *ctx};
     let state = state::init();
 
@@ -59,12 +60,12 @@ pub extern fn hilevel_handler_rst(ctx: *mut Context) {
 
         (*GICC0).CTLR         = 0x00000001; // enable GIC interface
         (*GICD0).CTLR         = 0x00000001; // enable GIC distributor
-
-        bindings::int_enable_irq();
     }
 
     state.process_manager.create_process(main_console, state.io_manager.default_files());
     state.process_manager.dispatch(ctx, ScheduleSource::Reset);
+
+    unsafe { bindings::int_enable_irq(); }
 }
 
 #[no_mangle]
