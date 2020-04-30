@@ -3,6 +3,7 @@ use core::cell::RefCell;
 use alloc::collections::VecDeque;
 use crate::io::tasks::{ReadTask, WriteTask};
 use num::range;
+use core::fmt::Debug;
 
 pub type StrongFileDescriptorRef = Rc<RefCell<dyn FileDescriptor>>;
 
@@ -11,7 +12,7 @@ pub struct IOResult {
     pub blocked: bool       // Blocked means that there are more bytes still to be read when the file is ready
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct FileDescriptorBase {
     pending_reads: VecDeque<ReadTask>,
     pending_writes: VecDeque<WriteTask>
@@ -23,7 +24,7 @@ pub enum FileError {
 }
 
 // An "abstract class" for different types of files, accessed through the read/write API
-pub trait FileDescriptor {
+pub trait FileDescriptor: Debug {
 
     fn base(&mut self) -> &mut FileDescriptorBase;
 

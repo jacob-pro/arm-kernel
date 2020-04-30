@@ -9,7 +9,7 @@ use alloc::collections::VecDeque;
 
 const KEYBOARD_BUFFER: usize = 4096;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PL011(*mut PL011_t);
 
 pub fn UART0() -> PL011 {
@@ -39,6 +39,7 @@ impl Write for PL011 {
     }
 }
 
+#[derive(Debug)]
 pub struct PL011FileDescriptor {
     internal: PL011,
     base: FileDescriptorBase,

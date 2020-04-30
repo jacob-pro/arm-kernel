@@ -7,7 +7,7 @@ use core::iter::Step;
 
 // A table of Integers keys to V, which can automatically generate new keys
 // BTreeMap will be fast for ordered integer keys
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct IdTable<K, V>(BTreeMap<K, V>);
 
 impl <K, V> ops::Deref for IdTable<K, V>  {

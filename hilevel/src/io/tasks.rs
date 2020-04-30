@@ -3,17 +3,20 @@ use alloc::rc::Rc;
 use core::slice;
 use crate::io::descriptor::{IOResult, FileError};
 
+#[derive(Debug)]
 pub struct TaskBase {
     process: WeakPcbRef,
     completed: usize,
     length: usize,
 }
 
+#[derive(Debug)]
 pub struct ReadTask {
     base: TaskBase,
     destination: *mut u8,
 }
 
+#[derive(Debug)]
 pub struct WriteTask {
     base: TaskBase,
     source: *const u8,

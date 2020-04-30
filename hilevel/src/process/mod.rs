@@ -25,7 +25,7 @@ pub struct ProcessManager {
     scheduler: MLFQScheduler,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum ProcessStatus {
     Ready,
     Executing,
@@ -44,6 +44,7 @@ pub enum ScheduleSource {
 pub type StrongPcbRef = Rc<RefCell<ProcessControlBlock>>;
 pub type WeakPcbRef = Weak<RefCell<ProcessControlBlock>>;
 
+#[derive(Debug)]
 pub struct ProcessControlBlock {
     pid: PID,
     status: ProcessStatus,
