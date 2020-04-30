@@ -14,7 +14,6 @@ typedef struct Philosopher {
     int right_send;
     bool has_left;
     bool has_right;
-    bool reverse;
 } Philosopher;
 
 #pragma clang diagnostic push
@@ -33,13 +32,8 @@ void philosopher_function(Philosopher self) {
         strcpy(waitingMsg, startMsg);
         strcat(waitingMsg, " is waiting to eat");
         write(STDOUT_FILENO, waitingMsg, strlen(waitingMsg));
-        if (self.reverse) {
-            if (!self.has_right) read(self.right_recv, &right_fork, 1);
-            if (!self.has_left) read(self.left_recv, &left_fork, 1);
-        } else {
-            if (!self.has_left) read(self.left_recv, &left_fork, 1);
-            if (!self.has_right) read(self.right_recv, &right_fork, 1);
-        }
+        if (!self.has_left) read(self.left_recv, &left_fork, 1);
+        if (!self.has_right) read(self.right_recv, &right_fork, 1);
         self.has_left = true;
         self.has_right = true;
 
@@ -92,27 +86,19 @@ void main_philosopher() {
         if (i == 0) {       // First starts with Left + Right
             x.has_left = true;
             x.has_right = true;
-            x.reverse = false;
         } else if (i == PHILOSOPHERS_COUNT - 1) {   // Last starts with none
             x.has_left = false;
             x.has_right = false;
-            x.reverse = true;
         } else {        // Everyone else starts with their Right only
             x.has_left = false;
             x.has_right = true;
-            x.reverse = false;
         }
 
         // Begin philosopher processes
         if (fork() != 0) {
             philosopher_function(x);
-            break;
+            exit(EXIT_SUCCESS);
         }
-    }
-
-    // Don't exit so child processes stay alive
-    while (1) {
-        yield();
     }
     exit(EXIT_SUCCESS);
 }
