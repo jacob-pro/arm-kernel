@@ -4,6 +4,7 @@ use cty::{c_uint, c_void};
 
 struct NewLibAlloc;
 
+// By binding to the NewLib malloc, we are able to use Rust's heap features, such as Vectors etc.
 unsafe impl GlobalAlloc for NewLibAlloc {
 
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
