@@ -1,0 +1,6 @@
+core/**/*.c linguist-vendored
+core/**/*.h linguist-vendored
+core/**/*.py linguist-vendored
+
+core/user/** -linguist-vendored
+core/bindings.h -linguist-vendored
