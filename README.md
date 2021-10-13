@@ -1,4 +1,16 @@
-# Concurrent Computing CW2
+# ARM Kernel
+
+Bristol COMS20001_2019 Concurrent Computing (Yr 2), Coursework 2
+
+Confirmed mark: 75
+
+A minimal operating system kernel for the RealView Platform Baseboard for Cortex-A8.
+Features include:
+
+- Pre-emptive multi-tasking
+- MLFQ Scheduler
+- Fork, exec, and exit system calls
+- Blocking IPC using Unix style pipes 
 
 ## Building
 
